@@ -1,57 +1,91 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Archiving
 and Interchange DTD v1.2 20190208//EN" "JATS-archivearticle1.dtd">
+
 <article xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink" dtd-version="1.2" article-type="other">
-  <front>
-    <article-meta>
-      <title-group>
-        <article-title>Analysis of Volumetric Muscle Loss Injury and Treatments
+
+<front>
+
+
+<article-meta>
+
+
+<title-group>
+<article-title>Analysis of Volumetric Muscle Loss Injury and Treatments
 in the Rodent Lateral Gastrocnemius</article-title>
-      </title-group>
-      <contrib-group>
-        <contrib contrib-type="author" corresp="yes">
-          <contrib-id contrib-id-type="orcid">0009-0000-2318-9510</contrib-id>
-          <name>
-            <surname>Burke</surname>
-            <given-names>Hudson</given-names>
-          </name>
-          <string-name>Hudson Burke</string-name>
-          <email>hudsonburke@virginia.edu</email>
-          <xref ref-type="aff" rid="aff-1">a</xref>
-          <xref ref-type="corresp" rid="cor-1">*</xref>
-        </contrib>
-        <contrib contrib-type="author">
-          <name>
-            <surname>Russell</surname>
-            <given-names>Shawn</given-names>
-          </name>
-          <string-name>Shawn Russell</string-name>
-          <email>sdr2n@virginia.edu</email>
-          <xref ref-type="aff" rid="aff-1">a</xref>
-        </contrib>
-        <contrib contrib-type="author">
-          <name>
-            <surname>Christ</surname>
-            <given-names>George</given-names>
-          </name>
-          <string-name>George Christ</string-name>
-        </contrib>
-      </contrib-group>
-      <aff id="aff-1">
-        <institution-wrap>
-          <institution>University of Virginia</institution>
-        </institution-wrap>
-      </aff>
-      <author-notes>
-        <corresp id="cor-1">hudsonburke@virginia.edu</corresp>
-      </author-notes>
-      <history/>
-    </article-meta>
-  </front>
-  <body>
-    <sec id="abstract">
-      <title>1 Abstract</title>
-      <p>Volumetric muscle loss (VML) is a debilitating injury involving
+</title-group>
+
+<contrib-group>
+<contrib contrib-type="author" corresp="yes">
+<contrib-id contrib-id-type="orcid">0009-0000-2318-9510</contrib-id>
+<name>
+<surname>Burke</surname>
+<given-names>Hudson</given-names>
+</name>
+<string-name>Hudson Burke</string-name>
+
+<email>hudsonburke@virginia.edu</email>
+<xref ref-type="aff" rid="aff-1">a</xref>
+<xref ref-type="corresp" rid="cor-1">&#x002A;</xref>
+</contrib>
+<contrib contrib-type="author">
+<name>
+<surname>Russell</surname>
+<given-names>Shawn</given-names>
+</name>
+<string-name>Shawn Russell</string-name>
+
+<email>sdr2n@virginia.edu</email>
+<xref ref-type="aff" rid="aff-1">a</xref>
+</contrib>
+<contrib contrib-type="author">
+<name>
+<surname>Christ</surname>
+<given-names>George</given-names>
+</name>
+<string-name>George Christ</string-name>
+
+</contrib>
+</contrib-group>
+<aff id="aff-1">
+<institution-wrap>
+<institution>University of Virginia</institution>
+</institution-wrap>
+
+
+
+
+
+
+
+</aff>
+<author-notes>
+<corresp id="cor-1">hudsonburke@virginia.edu</corresp>
+</author-notes>
+
+
+
+
+
+
+
+
+
+<history></history>
+
+
+
+
+
+
+</article-meta>
+
+</front>
+
+<body>
+<sec id="abstract">
+  <title>1 Abstract</title>
+  <p>Volumetric muscle loss (VML) is a debilitating injury involving
   removal of skeletal muscle and resulting in permanent functional
   deficits. This injury is often seen in military personnel from combat
   wounds and in civilian populations from traumatic accidents. While
@@ -75,17 +109,17 @@ in the Rodent Lateral Gastrocnemius</article-title>
   analysis in differentiating treatment efficacy for musculoskeletal
   disorders and provide insight into avenues that may better restore
   functional outcomes.</p>
-    </sec>
-    <sec id="introduction">
-      <title>2 Introduction</title>
-      <p>Volumetric muscle loss (VML), the traumatic or surgical removal of
+</sec>
+<sec id="introduction">
+  <title>2 Introduction</title>
+  <p>Volumetric muscle loss (VML), the traumatic or surgical removal of
   skeletal muscle beyond the point of natural regeneration, results in
   severe, permanent functional impairment
   groganVolumetricMuscleLoss2011. Common in military personnel and
   civilians following severe trauma, VML involves the loss of muscle
   fibers leading to non-regenerative scar tissue formation that prevents
   functional recovery.</p>
-      <p>Current clinical treatments for VML, such as physical therapy or
+  <p>Current clinical treatments for VML, such as physical therapy or
   autologous tissue transfer, have limited efficacy in restoring
   pre-injury muscle strength and function, often with the drawback of
   donor site morbidity (Aurora et al., 2014; Garg et al., 2015). This
@@ -98,7 +132,7 @@ in the Rodent Lateral Gastrocnemius</article-title>
   engineered muscle repair (TEMR) construct and its use in treating VML
   in combination with other biomaterials (Corona et al., 2012, 2013;
   Machingal et al., 2011).</p>
-      <p>Previous work from this group has demonstrated the efficacy of
+  <p>Previous work from this group has demonstrated the efficacy of
   motion capture technology and musculoskeletal modeling for use with
   rodent gait analysis, going beyond the previous standard methodology
   solely examining muscle force generation capacity (Buchner et al.,
@@ -111,7 +145,7 @@ in the Rodent Lateral Gastrocnemius</article-title>
   established the necessary 3D motion capture and musculoskeletal
   modeling methodologies for evaluating the effectiveness of biomaterial
   constructs as VML treatment strategies.</p>
-      <p>The goal of this study is to provide a broad, direct comparison of
+  <p>The goal of this study is to provide a broad, direct comparison of
   the functional recovery efficacy of different biomaterial treatment
   strategies for VML in a rat hindlimb model using the lateral
   gastrocnemius (LG) muscle. We hypothesized that combination therapies
@@ -122,12 +156,12 @@ in the Rodent Lateral Gastrocnemius</article-title>
   effectively mitigate the pathological compensations associated with
   VML and demonstrate the efficacy of rodent gait analysis as a modeling
   platform for various musculoskeletal injuries.</p>
-    </sec>
-    <sec id="methods">
-      <title>3 Methods</title>
-      <sec id="experimental-design">
-        <title>3.1 Experimental Design</title>
-        <p>Forty-eight 12-week-old female Lewis rats were divided into six
+</sec>
+<sec id="methods">
+  <title>3 Methods</title>
+  <sec id="experimental-design">
+    <title>3.1 Experimental Design</title>
+    <p>Forty-eight 12-week-old female Lewis rats were divided into six
     treatment groups, with eight rats per group. A 20% by-mass
     volumetric muscle loss (VML) injury was created in the left lateral
     gastrocnemius (LG) muscle of each animal. The first group was a
@@ -146,10 +180,10 @@ in the Rodent Lateral Gastrocnemius</article-title>
     no repair to clarify trends in recovery or decline. A previously
     collected dataset of 32 animals was used as the
     <italic>Control</italic> group.</p>
-      </sec>
-      <sec id="animal-care-and-surgical-procedures">
-        <title>3.2 Animal Care and Surgical Procedures</title>
-        <p>All animal procedures were approved by the University of Virginia
+  </sec>
+  <sec id="animal-care-and-surgical-procedures">
+    <title>3.2 Animal Care and Surgical Procedures</title>
+    <p>All animal procedures were approved by the University of Virginia
     Animal Care and Use Committee, conducted in compliance with the
     <italic>Guide for the Care and Use of Laboratory Animals</italic> ,
     the Animal Welfare Act, and the Implementing Animal Welfare
@@ -157,7 +191,7 @@ in the Rodent Lateral Gastrocnemius</article-title>
     pair-housed in a vivarium accredited by the American Association for
     the Accreditation of Laboratory Animal Care with ad libitum access
     to food and water.</p>
-        <p>The VML injury surgery was performed in accordance with the
+    <p>The VML injury surgery was performed in accordance with the
     procedure outlined in Merritt et al. (2010). The LG was exposed and
     a 20% distal portion was excised by mass. The assigned repair
     material was then implanted into the defect following methodologies
@@ -167,7 +201,7 @@ in the Rodent Lateral Gastrocnemius</article-title>
     and the skin was closed with 5-0 prolene using interrupted sutures
     with skin glue over top to reduce the risk of reopening the
     incision.</p>
-        <p>Prior to surgery, slow-release buprenorphine was administered
+    <p>Prior to surgery, slow-release buprenorphine was administered
     (0.1 mg/kg, subcutaneously). All surgical procedures along with
     shaving and motion capture marker placement were performed under
     continuous isoflurane anesthesia inhalation (1.5–2.5%). The depth of
@@ -179,10 +213,10 @@ in the Rodent Lateral Gastrocnemius</article-title>
     subcutaneously) at 36 and 48 hours. No animal required additional
     analgesia after 48 hours post-surgery as determined by veterinary
     staff that monitored for pain and distress.</p>
-      </sec>
-      <sec id="motion-capture-and-gait-analysis">
-        <title>3.3 Motion Capture and Gait Analysis</title>
-        <p>After 24 weeks to allow for injury progression or healing, gait
+  </sec>
+  <sec id="motion-capture-and-gait-analysis">
+    <title>3.3 Motion Capture and Gait Analysis</title>
+    <p>After 24 weeks to allow for injury progression or healing, gait
     data was collected for each rat in the treatment groups. Reflective
     markers were adhered to bony landmarks on the pelvis and joint
     locations on the hindlimb based on the set described by Johnson et
@@ -201,10 +235,10 @@ in the Rodent Lateral Gastrocnemius</article-title>
     strike to foot strike, per hindlimb without overlap on a force plate
     during stance phase were collected for each rat at each time
     point.</p>
-      </sec>
-      <sec id="gait-modeling-and-statistical-analysis">
-        <title>3.4 Gait Modeling and Statistical Analysis</title>
-        <p>Marker trajectories and ground reaction force data were filtered
+  </sec>
+  <sec id="gait-modeling-and-statistical-analysis">
+    <title>3.4 Gait Modeling and Statistical Analysis</title>
+    <p>Marker trajectories and ground reaction force data were filtered
     using a 4th order, low-pass, Butterworth filter (cutoff frequencies
     of 15 Hz and 100 Hz, respectively). For each rat, a subject specific
     OpenSim model of the hindlimbs was generated from limb measurements
@@ -228,22 +262,19 @@ in the Rodent Lateral Gastrocnemius</article-title>
     significant difference compared to No Repair, and a black
     highlighted region indicates significant difference compared to
     Control. Statistical significance was set at α=0.05.</p>
-      </sec>
-    </sec>
-    <sec id="results">
-      <title>4 Results</title>
-      <sec id="spatiotemporal-parameters">
-        <title>4.1 Spatiotemporal Parameters</title>
-        <p>Stride length, step width, and velocity are normalized by leg
+  </sec>
+</sec>
+<sec id="results">
+  <title>4 Results</title>
+  <sec id="spatiotemporal-parameters">
+    <title>4.1 Spatiotemporal Parameters</title>
+    <p>Stride length, step width, and velocity are normalized by leg
     length calculated by summing the femur and tibia lengths.</p>
-        <graphic mimetype="image" mime-subtype="png" xlink:href="images/STP_table.png"/>
-        <p>
-          <italic>^, ^^, ^^^ indicates p &lt; 0.05, 0.01, 0.001
-    respectively compared to NR</italic>
-          <italic>*, **, *** indicates p
-    &lt; 0.05, 0.01, 0.001 respectively compared to Control</italic>
-        </p>
-        <p>The No Repair group had a significantly narrower step width and
+    <graphic mimetype="image" mime-subtype="png" xlink:href="images/STP_table.png" />
+    <p><italic>^, ^^, ^^^ indicates p &lt; 0.05, 0.01, 0.001
+    respectively compared to NR</italic> <italic>*, **, *** indicates p
+    &lt; 0.05, 0.01, 0.001 respectively compared to Control</italic></p>
+    <p>The No Repair group had a significantly narrower step width and
     decreased stance percentage compared to the control group. This
     narrower step width was reflected in nearly every other treatment
     except the TEMR+HH group. All groups that received some form of TEMR
@@ -251,16 +282,14 @@ in the Rodent Lateral Gastrocnemius</article-title>
     and No Repair groups. This was coupled with significant increases in
     stance percentages and decreases in stride lengths compared to the
     Control group.</p>
-      </sec>
-      <sec id="kinematics-and-kinetics">
-        <title>4.2 Kinematics and Kinetics</title>
-        <sec id="no-repair-nr">
-          <title>4.2.1 No Repair (NR)</title>
-          <p>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/NR_kinematics.png"/>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/NR_kinetics.png"/>
-          </p>
-          <p>The primary differences seen in the injured subjects compared
+  </sec>
+  <sec id="kinematics-and-kinetics">
+    <title>4.2 Kinematics and Kinetics</title>
+    <sec id="no-repair-nr">
+      <title>4.2.1 No Repair (NR)</title>
+      <p><inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/NR_kinematics.png" />
+      <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/NR_kinetics.png" /></p>
+      <p>The primary differences seen in the injured subjects compared
       to the control dataset were an increased ankle dorsiflexion angle
       during mid-stance coupled with increases in the knee extension and
       hip internal rotation moments. These changes suggest that to
@@ -271,14 +300,12 @@ in the Rodent Lateral Gastrocnemius</article-title>
       knee and hip. Effective therapies would be expected to mitigate
       these compensations and restore more normal kinematic and kinetic
       patterns.</p>
-        </sec>
-        <sec id="healy-hydrogel-hh">
-          <title>4.2.2 Healy Hydrogel (HH)</title>
-          <p>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HH_kinematics.png"/>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HH_kinetics.png"/>
-          </p>
-          <p>The Healy Hydrogel group demonstrated very similar kinematic
+    </sec>
+    <sec id="healy-hydrogel-hh">
+      <title>4.2.2 Healy Hydrogel (HH)</title>
+      <p><inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HH_kinematics.png" />
+      <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HH_kinetics.png" /></p>
+      <p>The Healy Hydrogel group demonstrated very similar kinematic
       and kinetic patterns to the No Repair group, with increased ankle
       dorsiflexion during mid-stance and elevated knee extension and hip
       internal rotation moments. Significance was also seen in some
@@ -286,14 +313,12 @@ in the Rodent Lateral Gastrocnemius</article-title>
       variability in marker placement. This suggests that the hydrogel
       alone did not provide sufficient functional recovery to alter the
       compensatory gait strategies observed in the No Repair group.</p>
-        </sec>
-        <sec id="healy-sponge-hs">
-          <title>4.2.3 Healy Sponge (HS)</title>
-          <p>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HS_kinematics.png"/>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HS_kinetics.png"/>
-          </p>
-          <p>The Healy Sponge group exhibited kinematic and kinetic patterns
+    </sec>
+    <sec id="healy-sponge-hs">
+      <title>4.2.3 Healy Sponge (HS)</title>
+      <p><inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HS_kinematics.png" />
+      <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HS_kinetics.png" /></p>
+      <p>The Healy Sponge group exhibited kinematic and kinetic patterns
       more similar to the Control group compared to the No Repair and
       Healy Hydrogel groups. While some significant difference remained
       in the knee extension moment, the curve shifted away from the
@@ -307,34 +332,28 @@ in the Rodent Lateral Gastrocnemius</article-title>
       result of a higher variance. This indicates that the sponge may
       have provided a more conducive environment for muscle regeneration
       or functional compensation compared to the hydrogel.</p>
-        </sec>
-        <sec id="tissue-engineered-muscle-repair-combination-therapies">
-          <title>4.2.4 Tissue-Engineered Muscle Repair Combination
+    </sec>
+    <sec id="tissue-engineered-muscle-repair-combination-therapies">
+      <title>4.2.4 Tissue-Engineered Muscle Repair Combination
       Therapies</title>
-          <p>Many of the TEMR groups exhibited similar patterns and will be
+      <p>Many of the TEMR groups exhibited similar patterns and will be
       analyzed together.</p>
-        </sec>
-        <sec id="tissue-engineered-muscle-repair-temr">
-          <title>4.2.5 Tissue-Engineered Muscle Repair (TEMR)</title>
-          <p>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_kinematics.png"/>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_kinetics.png"/>
-          </p>
-        </sec>
-        <sec id="temr-and-hydrogel-temrhh">
-          <title>4.2.6 TEMR and Hydrogel (TEMR+HH)</title>
-          <p>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_HH_kinematics.png"/>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_HH_kinetics.png"/>
-          </p>
-        </sec>
-        <sec id="temr-and-keratin-gel-temrkg">
-          <title>4.2.7 TEMR and Keratin Gel (TEMR+KG)</title>
-          <p>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_KG_kinematics.png"/>
-            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_KG_kinetics.png"/>
-          </p>
-          <p>Kinematically, the ankle dorsiflexion angle is still
+    </sec>
+    <sec id="tissue-engineered-muscle-repair-temr">
+      <title>4.2.5 Tissue-Engineered Muscle Repair (TEMR)</title>
+      <p><inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_kinematics.png" />
+      <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_kinetics.png" /></p>
+    </sec>
+    <sec id="temr-and-hydrogel-temrhh">
+      <title>4.2.6 TEMR and Hydrogel (TEMR+HH)</title>
+      <p><inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_HH_kinematics.png" />
+      <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_HH_kinetics.png" /></p>
+    </sec>
+    <sec id="temr-and-keratin-gel-temrkg">
+      <title>4.2.7 TEMR and Keratin Gel (TEMR+KG)</title>
+      <p><inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_KG_kinematics.png" />
+      <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_KG_kinetics.png" /></p>
+      <p>Kinematically, the ankle dorsiflexion angle is still
       significantly elevated in mid-stance compared to Control. The
       kinetic profile across all three TEMR groups is similar, with
       decreased knee extension moment during stance compared to the No
@@ -347,14 +366,14 @@ in the Rodent Lateral Gastrocnemius</article-title>
       suggest that while the TEMR treatments may not fully restore
       normal gait mechanics, they do introduce unique compensatory
       strategies, particularly at the ankle joint.</p>
-        </sec>
-      </sec>
     </sec>
-    <sec id="discussion">
-      <title>5 Discussion</title>
-      <sec id="summary-of-findings">
-        <title>5.1 Summary of Findings</title>
-        <p>This study provides a comprehensive biomechanical analysis of
+  </sec>
+</sec>
+<sec id="discussion">
+  <title>5 Discussion</title>
+  <sec id="summary-of-findings">
+    <title>5.1 Summary of Findings</title>
+    <p>This study provides a comprehensive biomechanical analysis of
     various treatment strategies for volumetric muscle loss (VML) in a
     rat model. The No Repair group exhibited significant compensatory
     gait adaptations, including increased ankle dorsiflexion and
@@ -371,10 +390,10 @@ in the Rodent Lateral Gastrocnemius</article-title>
     introduced unique compensatory strategies, particularly at the ankle
     joint, highlighting their potential to mitigate some functional
     deficits associated with VML.</p>
-      </sec>
-      <sec id="limitations-and-future-directions">
-        <title>5.2 Limitations and Future Directions</title>
-        <p>In this study, joint moments were normalized to body mass
+  </sec>
+  <sec id="limitations-and-future-directions">
+    <title>5.2 Limitations and Future Directions</title>
+    <p>In this study, joint moments were normalized to body mass
     multiplied by total length, a common approach to account for size
     differences among subjects and facilitate comparison across groups.
     However, this normalization method has limitations as it is based on
@@ -404,11 +423,11 @@ in the Rodent Lateral Gastrocnemius</article-title>
     histological and molecular analyses of the repair tissue would
     delineate the biological mechanisms that contribute to the
     distinction between successful and unsuccessful treatments.</p>
-      </sec>
-    </sec>
-    <sec id="conclusion">
-      <title>6 Conclusion</title>
-      <p>Volumetric muscle loss causes functional impairments that are not
+  </sec>
+</sec>
+<sec id="conclusion">
+  <title>6 Conclusion</title>
+  <p>Volumetric muscle loss causes functional impairments that are not
   adequately addressed by current clinical practice. This study provides
   a broad comparison of the long-term functional efficacy of several
   preclinical regenerative strategies. We found that while no treatment
@@ -419,8 +438,12 @@ in the Rodent Lateral Gastrocnemius</article-title>
   detailed biomechanical assessment in evaluating VML treatments and
   highlights the potential of biomaterials to enhance regenerative
   outcomes.</p>
-    </sec>
-  </body>
-  <back>
+</sec>
+</body>
+
+<back>
 </back>
+
+
+
 </article>
