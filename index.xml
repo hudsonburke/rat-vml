@@ -98,36 +98,19 @@ in the Rodent Lateral Gastrocnemius</article-title>
   engineered muscle repair (TEMR) construct and its use in treating VML
   in combination with other biomaterials (Corona et al., 2012, 2013;
   Machingal et al., 2011).</p>
-      <p>The main metric for assessment of success in these treatments has
-  been force generating capacity of the muscle with the assumption that
-  a return to full muscle force generation capacity would represent a
-  complete return to function. However, this metric does not fully
-  capture the complexities of dynamic, weight-bearing movement as seen
-  in gait, and several studies on human populations have indicated that
-  natural movement is not necessarily restored along with force
-  generation capacity (Buchner et al., 1997; Damiano et al., 2010, 2013;
-  Damiano &amp; Abel, 1998; Topp et al., 1993). Gait analysis offers
-  longitudinal method to assess how an animal functionally adapts to
-  injury and responds to treatment beyond the force generation. Motion
-  analysis tools have become more prevalent in the evaluation of
-  movement pathologies in rodents, including VML (Dienes et al., 2019),
-  arthritis (Allen et al., 2012; Hamilton et al., 2015; Vincelette et
-  al., 2007), nerve injury (Bauman &amp; Chang, 2013; Bennett et al.,
-  2012; Kappos et al., 2017), and spinal cord injury (Beare et al.,
-  2009; Bhimani et al., 2017; Hamers et al., 2001; Koopmans et al.,
-  2005). Many of these studies rely on spatiotemporal parameters to
-  elucidate gait pathologies, but few examine the kinematics and
-  kinetics during locomotion which may provide more insight into
-  compensatory mechanisms that develop in response to injury.</p>
-      <p>Recent studies from this group have contributed to the
-  understanding of both normal and pathologic rat gait. Dienes (2019)
-  reported changes in gait kinematics in rats with VML injuries to the
-  tibialis anterior during treadmill walking. Hicks and Dienes (2022)
-  established a normative database for rat gait kinematics and kinetics
-  during over-ground walking. These studies have established the
-  necessary 3D motion capture and musculoskeletal modeling methodologies
-  for evaluating the effectiveness of biomaterial constructs as VML
-  treatment strategies.</p>
+      <p>Previous work from this group has demonstrated the efficacy of
+  motion capture technology and musculoskeletal modeling for use with
+  rodent gait analysis, going beyond the previous standard methodology
+  solely examining muscle force generation capacity (Buchner et al.,
+  1997; Damiano et al., 2010, 2013; Damiano &amp; Abel, 1998; Topp et
+  al., 1993). Dienes (2019) reported changes in gait kinematics in rats
+  with VML injuries to the tibialis anterior during treadmill walking.
+  Hicks and Dienes (2022) established a normative database for rat gait
+  kinematics and kinetics during over-ground walking. They also
+  investigated the use of these techniques to analyze These studies have
+  established the necessary 3D motion capture and musculoskeletal
+  modeling methodologies for evaluating the effectiveness of biomaterial
+  constructs as VML treatment strategies.</p>
       <p>The goal of this study is to provide a broad, direct comparison of
   the functional recovery efficacy of different biomaterial treatment
   strategies for VML in a rat hindlimb model using the lateral
@@ -231,20 +214,20 @@ in the Rodent Lateral Gastrocnemius</article-title>
     Reported data corresponds to one gait cycle, with the stance and
     swing phase of the right stride reported independently to minimize
     the effects of phasing caused by velocity differences. Moments were
-    normalized to total body mass (Nm/kg) except for knee flexion which
-    was normalized to total body mass*tibia length. <bold>HOW SHOULD
-    THIS BE EXPLAINED</bold> Spatiotemporal parameters (STPs) were
-    calculated in Vicon Nexus using standard definitions as presented in
-    Huxley et al. ( #missingreference). At the 24-week endpoint, STPs
-    were compared to No Repair dataset using unpaired t-tests. For
-    time-series kinematic and kinetic data, Statistical Parametric
-    Mapping (SPM) with unpaired t-tests was used to identify regional
-    significant differences across the gait cycle between groups
-    indicated by highlighted vertical rectangles (Pataky et al. 2016). A
-    red highlighted region indicates significant difference compared to
-    No Repair, and a black highlighted region indicates significant
-    difference compared to Control. Statistical significance was set at
-    α=0.05.</p>
+    normalized to total body mass multiplied by the total length as is
+    common practice for kinetic analysis in biomechanics (Winters 2009).
+    Limitations to this normalization strategy will be covered in the
+    Discussion section. Spatiotemporal parameters (STPs) were calculated
+    in Vicon Nexus using standard definitions as presented in Huxley et
+    al(). At the 24-week endpoint, STPs were compared to No Repair
+    dataset using unpaired t-tests. For time-series kinematic and
+    kinetic data, Statistical Parametric Mapping (SPM) with unpaired
+    t-tests was used to identify regional significant differences across
+    the gait cycle between groups indicated by highlighted vertical
+    rectangles (Pataky et al. 2016). A red highlighted region indicates
+    significant difference compared to No Repair, and a black
+    highlighted region indicates significant difference compared to
+    Control. Statistical significance was set at α=0.05.</p>
       </sec>
     </sec>
     <sec id="results">
@@ -269,45 +252,154 @@ in the Rodent Lateral Gastrocnemius</article-title>
     stance percentages and decreases in stride lengths compared to the
     Control group.</p>
       </sec>
-      <sec id="no-repair-nr">
-        <title>4.2 No Repair (NR)</title>
-      </sec>
-      <sec id="healy-hydrogel-hh">
-        <title>4.3 Healy Hydrogel (HH)</title>
-      </sec>
-      <sec id="healy-sponge-hs">
-        <title>4.4 Healy Sponge (HS)</title>
-      </sec>
-      <sec id="tissue-engineered-muscle-repair-temr">
-        <title>4.5 Tissue-Engineered Muscle Repair (TEMR)</title>
-      </sec>
-      <sec id="temr-and-hydrogel-temrhh">
-        <title>4.6 TEMR and Hydrogel (TEMR+HH)</title>
-      </sec>
-      <sec id="temr-and-keratin-gel-temrkg">
-        <title>4.7 TEMR and Keratin Gel (TEMR+KG)</title>
+      <sec id="kinematics-and-kinetics">
+        <title>4.2 Kinematics and Kinetics</title>
+        <sec id="no-repair-nr">
+          <title>4.2.1 No Repair (NR)</title>
+          <p>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/NR_kinematics.png"/>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/NR_kinetics.png"/>
+          </p>
+          <p>The primary differences seen in the injured subjects compared
+      to the control dataset were an increased ankle dorsiflexion angle
+      during mid-stance coupled with increases in the knee extension and
+      hip internal rotation moments. These changes suggest that to
+      compensate for the loss of plantarflexor function, the animals are
+      adopting a gait strategy that reduces the demand on the ankle
+      joint by increasing dorsiflexion and utilizing more proximal
+      musculature to generate the necessary extension moments at the
+      knee and hip. Effective therapies would be expected to mitigate
+      these compensations and restore more normal kinematic and kinetic
+      patterns.</p>
+        </sec>
+        <sec id="healy-hydrogel-hh">
+          <title>4.2.2 Healy Hydrogel (HH)</title>
+          <p>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HH_kinematics.png"/>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HH_kinetics.png"/>
+          </p>
+          <p>The Healy Hydrogel group demonstrated very similar kinematic
+      and kinetic patterns to the No Repair group, with increased ankle
+      dorsiflexion during mid-stance and elevated knee extension and hip
+      internal rotation moments. Significance was also seen in some
+      other kinematic measures, but this is likely a result of
+      variability in marker placement. This suggests that the hydrogel
+      alone did not provide sufficient functional recovery to alter the
+      compensatory gait strategies observed in the No Repair group.</p>
+        </sec>
+        <sec id="healy-sponge-hs">
+          <title>4.2.3 Healy Sponge (HS)</title>
+          <p>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HS_kinematics.png"/>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/HS_kinetics.png"/>
+          </p>
+          <p>The Healy Sponge group exhibited kinematic and kinetic patterns
+      more similar to the Control group compared to the No Repair and
+      Healy Hydrogel groups. While some significant difference remained
+      in the knee extension moment, the curve shifted away from the
+      trajectory seen in the No Repair group and towards the Control
+      group, and the overall patterns suggested a trend toward
+      normalization of gait mechanics. The difference in ankle
+      dorsiflexion angle did not reach the level of significance
+      compared to either the Control or No Repair groups, but visual
+      inspection of the curves suggests it is still closer to the No
+      Repair values, and the lack of significance is more likely a
+      result of a higher variance. This indicates that the sponge may
+      have provided a more conducive environment for muscle regeneration
+      or functional compensation compared to the hydrogel.</p>
+        </sec>
+        <sec id="tissue-engineered-muscle-repair-combination-therapies">
+          <title>4.2.4 Tissue-Engineered Muscle Repair Combination
+      Therapies</title>
+          <p>Many of the TEMR groups exhibited similar patterns and will be
+      analyzed together.</p>
+        </sec>
+        <sec id="tissue-engineered-muscle-repair-temr">
+          <title>4.2.5 Tissue-Engineered Muscle Repair (TEMR)</title>
+          <p>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_kinematics.png"/>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_kinetics.png"/>
+          </p>
+        </sec>
+        <sec id="temr-and-hydrogel-temrhh">
+          <title>4.2.6 TEMR and Hydrogel (TEMR+HH)</title>
+          <p>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_HH_kinematics.png"/>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_HH_kinetics.png"/>
+          </p>
+        </sec>
+        <sec id="temr-and-keratin-gel-temrkg">
+          <title>4.2.7 TEMR and Keratin Gel (TEMR+KG)</title>
+          <p>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_KG_kinematics.png"/>
+            <inline-graphic mimetype="image" mime-subtype="png" xlink:href="images/TEMR_KG_kinetics.png"/>
+          </p>
+          <p>Kinematically, the ankle dorsiflexion angle is still
+      significantly elevated in mid-stance compared to Control. The
+      kinetic profile across all three TEMR groups is similar, with
+      decreased knee extension moment during stance compared to the No
+      Repair group but still significantly greater than the Control
+      group. Similarly, the hip internal rotation moments are
+      significantly greater than Control in mid-stance, akin to the No
+      Repair group. A unique adaptation that surfaces in the TEMR groups
+      is a decrease in ankle plantarflexion moment compared to both the
+      Control and No Repair groups during mid-stance. These findings
+      suggest that while the TEMR treatments may not fully restore
+      normal gait mechanics, they do introduce unique compensatory
+      strategies, particularly at the ankle joint.</p>
+        </sec>
       </sec>
     </sec>
     <sec id="discussion">
       <title>5 Discussion</title>
+      <sec id="summary-of-findings">
+        <title>5.1 Summary of Findings</title>
+        <p>This study provides a comprehensive biomechanical analysis of
+    various treatment strategies for volumetric muscle loss (VML) in a
+    rat model. The No Repair group exhibited significant compensatory
+    gait adaptations, including increased ankle dorsiflexion and
+    elevated knee and hip moments, indicative of the functional deficits
+    caused by VML. This pattern continued in treatment groups, though to
+    lesser extent, and likely represents a more flat-footed posture
+    during stance to be able to transfer more powere to the ground with
+    the knee. The Healy Hydrogel treatment did not significantly alter
+    these compensatory patterns, suggesting limited functional recovery.
+    In contrast, the Healy Sponge treatment showed trends toward
+    normalization of gait mechanics, indicating a more favorable
+    environment for muscle regeneration or compensation. The TEMR-based
+    treatments, while not fully restoring normal gait mechanics,
+    introduced unique compensatory strategies, particularly at the ankle
+    joint, highlighting their potential to mitigate some functional
+    deficits associated with VML.</p>
+      </sec>
       <sec id="limitations-and-future-directions">
-        <title>5.1 Limitations and Future Directions</title>
-        <p>This study provides a valuable biomechanical analysis of several
+        <title>5.2 Limitations and Future Directions</title>
+        <p>In this study, joint moments were normalized to body mass
+    multiplied by total length, a common approach to account for size
+    differences among subjects and facilitate comparison across groups.
+    However, this normalization method has limitations as it is based on
+    geometric scaling assumptions that may not adequately reflect rodent
+    limb growth over time. This analysis is limited by the lack of
+    age-matched controls that would provide a more direct comparison
+    between pathological gait adaptation and normative gait patterns.
+    Examining uninjured rodent gait patterns over time would also
+    provide an insight into potential normalization strategies. From a
+    small subset of uninjured rats, we noticed that there may be a
+    disproportionate growth in the tibia length compared to the femur
+    which could impact the moment arms seen at different joints. This
+    study provides a valuable biomechanical analysis of several
     different VML repairs at a single time point. A key future direction
     is a longitudinal analysis to track the evolution of these gait
     adaptations over the entire 24-week period, which would reveal the
     time-dependent aspects of recovery and delineate the progression of
-    pathological compensation strategies. Additionally, future studies
-    should include a time-matched, uninjured surgical control group to
-    isolate treatment effects from any changes that may surface as a
-    consequence of natural growth and aging. While the inverse dynamics
-    analysis reveals net joint moments, it falls short of partitioning
-    these into individual muscle force contributions. Future work using
-    advanced musculoskeletal modeling techniques, such as computed
-    muscle control, could estimate these forces and provide deeper
-    insight into neuromuscular compensation patterns. Furthermore,
-    expansion of the model to include the front limbs could uncover
-    further ways that the rats compensate for musculoskeletal
+    pathological compensation strategies. Additionally, while the
+    inverse dynamics analysis reveals net joint moments, it falls short
+    of partitioning these into individual muscle force contributions.
+    Future work using advanced musculoskeletal modeling techniques, such
+    as computed muscle control, could estimate these forces and provide
+    deeper insight into neuromuscular compensation patterns.
+    Furthermore, expansion of the model to include the front limbs could
+    uncover further ways that the rats compensate for musculoskeletal
     deficiencies. Finally, correlating these functional outcomes with
     histological and molecular analyses of the repair tissue would
     delineate the biological mechanisms that contribute to the
@@ -316,17 +408,17 @@ in the Rodent Lateral Gastrocnemius</article-title>
     </sec>
     <sec id="conclusion">
       <title>6 Conclusion</title>
-      <p>Volumetric muscle loss causes devastating functional impairments
-  that are not adequately addressed by current clinical practice. This
-  study provides a broad comparison of the long-term functional efficacy
-  of several preclinical regenerative strategies. We found that while no
-  treatment achieved a full return to uninjured function, therapies
-  incorporating a specific pro-regenerative hydrogel produced modest but
-  significant trends toward functional healing, demonstrating mitigated
-  pathological gait compensations. This work emphasizes the utility and
-  importance of detailed biomechanical assessment in evaluating VML
-  treatments and highlights the potential of biomaterials to enhance
-  regenerative outcomes.</p>
+      <p>Volumetric muscle loss causes functional impairments that are not
+  adequately addressed by current clinical practice. This study provides
+  a broad comparison of the long-term functional efficacy of several
+  preclinical regenerative strategies. We found that while no treatment
+  achieved a full return to uninjured function, therapies incorporating
+  a specific sponge material produced modest but significant trends
+  toward functional healing, demonstrating mitigated pathological gait
+  compensations. This work emphasizes the utility and importance of
+  detailed biomechanical assessment in evaluating VML treatments and
+  highlights the potential of biomaterials to enhance regenerative
+  outcomes.</p>
     </sec>
   </body>
   <back>
