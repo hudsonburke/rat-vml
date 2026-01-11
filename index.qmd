@@ -7,11 +7,14 @@ author:
     email: hudsonburke@virginia.edu
     affiliations:
       - University of Virginia
+  - name: Sydney Shriver
+  - name: Michael ?
+  - name: Xiao Hu
+  - name: George Christ
   - name: Shawn Russell
     email: sdr2n@virginia.edu
     affiliations:
       - University of Virginia
-  - name: George Christ
 date: last-modified
 number-sections: true
 jupyter: python3
@@ -50,9 +53,11 @@ Marker trajectories and ground reaction force data were filtered using a 4th ord
 ### Spatiotemporal Parameters
 Stride length, step width, and velocity are normalized by leg length calculated by summing the femur and tibia lengths.
 
+![](data/LG_VML_STPs.png)
 ![](images/STP_table.png)
 
-*^, ^^, ^^^ indicates p < 0.05, 0.01, 0.001 respectively compared to NR*
+*^, ^^, ^^^ indicates p < 0.05, 0.01, 0Master's.001 respectively compared to NR*
+
 *\*, \*\*, \*\*\* indicates p < 0.05, 0.01, 0.001 respectively compared to Control*
 
 The No Repair group had a significantly narrower step width and decreased stance percentage compared to the control group. This narrower step width was reflected in nearly every other treatment except the TEMR+HH group.

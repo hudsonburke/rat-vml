@@ -1,0 +1,23 @@
+## Compile sessions and subjects
+Walk through the processed data directory and compile subject parameters, kinematics, ground reaction forces, and inverse dynamics into a single data structure for analysis.
+```{python}
+import scipy.io as sio
+
+# for f in trial_files:
+#     mat = sio.loadmat(f)
+    
+```
+
+## SPM
+```{python}
+import spm1d
+
+```
+
+## Create plots
+```{python}
+import plotly.express as px
+import plotly.graph_objects as go
+
+
+```

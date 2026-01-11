@@ -10,3 +10,8 @@
 /.luarc.json
 
 **/*.quarto_ipynb
+/data/
+
+/.venv/
+/.vscode/
+/_freeze/
