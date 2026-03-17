@@ -65,6 +65,7 @@
 
 
 \usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 % Correct order of tables after \paragraph or \subparagraph
 \usepackage{etoolbox}
@@ -91,6 +92,39 @@
 \makeatother
 
 
+% definitions for citeproc citations
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ % allow citations to break across lines
+ \let\@cite@ofmt\@firstofone
+ % avoid brackets around text for \cite:
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}
+\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}
+\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2] % #1 hanging-indent, #2 entry-spacing
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}
+  \setlength{\leftmargin}{0pt}
+  \setlength{\parsep}{0pt}
+  % turn on hanging indent if param 1 is 1
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}
+   \setlength{\itemindent}{-1\cslhangindent}
+  \fi
+  % set entry spacing
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\usepackage{calc}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
 
 
 
@@ -155,7 +189,7 @@
 \urlstyle{same}
 \hypersetup{
   pdftitle={Analysis of Volumetric Muscle Loss Injury and Treatments in the Rodent Lateral Gastrocnemius},
-  pdfauthor={Hudson Burke; Shawn Russell; George Christ},
+  pdfauthor={Hudson Burke; Sydney Shriver; Michael ?; Xiao Hu; George Christ; Shawn Russell},
   colorlinks=true,
   linkcolor={blue},
   filecolor={Maroon},
@@ -171,8 +205,9 @@
 \title{Analysis of Volumetric Muscle Loss Injury and Treatments in the
 Rodent Lateral Gastrocnemius}
 
-\authors{Hudson Burke\affil{1}, Shawn Russell\affil{1}, George
-Christ\affil{}}
+\authors{Hudson Burke\affil{1}, Sydney Shriver\affil{1}, Michael
+?\affil{1}, Xiao Hu\affil{1}, George Christ\affil{1}, Shawn
+Russell\affil{1}}
 \affiliation{1}{University of Virginia, }
 \correspondingauthor{Hudson Burke}{hudsonburke@virginia.edu}
 
@@ -213,23 +248,19 @@ functional outcomes.
 Volumetric muscle loss (VML), the traumatic or surgical removal of
 skeletal muscle beyond the point of natural regeneration, results in
 severe, permanent functional impairment groganVolumetricMuscleLoss2011.
-Common in military personnel and civilians following severe trauma, VML
-involves the loss of muscle fibers leading to non-regenerative scar
-tissue formation that prevents functional recovery.
-
 Current clinical treatments for VML, such as physical therapy or
 autologous tissue transfer, have limited efficacy in restoring
 pre-injury muscle strength and function, often with the drawback of
-donor site morbidity (Aurora et al., 2014; Garg et al., 2015). This
-clinical gap has spurred significant preclinical research into
-regenerative strategies. These approaches often involve biomaterial
-scaffolds (Grasman et al., 2015; Passipieri et al., 2019), injectable
-hydrogels (X. Wu et al., 2012), cell-based therapies, and adjunctive
-treatments like exercise (Corona et al., 2013; Dziki et al., 2016). One
-significant effort has focused on the development of a tissue engineered
-muscle repair (TEMR) construct and its use in treating VML in
-combination with other biomaterials (Corona et al., 2012, 2013;
-Machingal et al., 2011).
+donor site morbidity \href{Garg\%20et\%20al.,\%202015}{Amit Aurora et
+al. (2014); (\textbf{garg?})}. This clinical gap has spurred significant
+preclinical research into regenerative strategies. These approaches
+often involve biomaterial scaffolds (Grasman et al., 2015; Passipieri et
+al., 2017), injectable hydrogels (Wu et al., 2012), cell-based
+therapies, and adjunctive treatments like exercise (Corona et al., 2017;
+Dziki et al., 2016). One significant effort has focused on the
+development of a tissue engineered muscle repair (TEMR) construct and
+its use in treating VML in combination with other biomaterials (Corona
+et al., 2012, 2013; Machingal et al., 2011).
 
 Previous work from this group has demonstrated the efficacy of motion
 capture technology and musculoskeletal modeling for use with rodent gait
@@ -355,8 +386,8 @@ endpoint, STPs were compared to No Repair dataset using unpaired
 t-tests. For time-series kinematic and kinetic data, Statistical
 Parametric Mapping (SPM) with unpaired t-tests was used to identify
 regional significant differences across the gait cycle between groups
-indicated by highlighted vertical rectangles (Pataky et al.~2016). A red
-highlighted region indicates significant difference compared to No
+indicated by highlighted vertical rectangles (Pataky et al., 2016). A
+red highlighted region indicates significant difference compared to No
 Repair, and a black highlighted region indicates significant difference
 compared to Control. Statistical significance was set at α=0.05.
 
@@ -369,9 +400,11 @@ calculated by summing the femur and tibia lengths.
 
 \pandocbounded{\includegraphics[keepaspectratio]{images/STP_table.png}}
 
-\emph{\^{}, \^{}\^{}, \^{}\^{}\^{} indicates p \textless{} 0.05, 0.01,
-0.001 respectively compared to NR} \emph{*, **, *** indicates p
-\textless{} 0.05, 0.01, 0.001 respectively compared to Control}
+\emph{\^{}, \textsuperscript{}, \textsuperscript{}\^{} indicates p
+\textless{} 0.05, 0.01, 0Master's.001 respectively compared to NR}
+
+\emph{*, **, *** indicates p \textless{} 0.05, 0.01, 0.001 respectively
+compared to Control}
 
 The No Repair group had a significantly narrower step width and
 decreased stance percentage compared to the control group. This narrower
@@ -537,6 +570,58 @@ compensations. This work emphasizes the utility and importance of
 detailed biomechanical assessment in evaluating VML treatments and
 highlights the potential of biomaterials to enhance regenerative
 outcomes.
+
+\protect\phantomsection\label{refs}
+\begin{CSLReferences}{1}{0}
+\bibitem[\citeproctext]{ref-AmitAurora-etal-2014}
+Amit Aurora, Aurora, A., Koyal Garg, Garg, K., Benjamin T. Corona,
+Corona, B. T., et al. (2014). Physical rehabilitation improves muscle
+function following volumetric muscle loss injury. \emph{Sports Medicine,
+Arthroscopy, Rehabilitation, Therapy \& Technology}, \emph{6}(1),
+41--41. \url{https://doi.org/10.1186/2052-1847-6-41}
+
+\bibitem[\citeproctext]{ref-coronaContributionMincedMuscle2017}
+Corona, B. T., Henderson, B. E. P., Ward, C. L., \& Greising, S. M.
+(2017). Contribution of minced muscle graft progenitor cells to muscle
+fiber formation after volumetric muscle loss injury in wild-type and
+immune deficient mice. \emph{Physiological Reports}, \emph{5}(7).
+\url{https://doi.org/10.14814/phy2.13249}
+
+\bibitem[\citeproctext]{ref-dzikiAcellularBiologicScaffold2016}
+Dziki, J., Badylak, S., Yabroudi, M., Sicari, B., Ambrosio, F., Stearns,
+K., et al. (2016). An acellular biologic scaffold treatment for
+volumetric muscle loss: Results of a 13-patient cohort study. \emph{Npj
+Regenerative Medicine}, \emph{1}(1), 1--12.
+\url{https://doi.org/10.1038/npjregenmed.2016.8}
+
+\bibitem[\citeproctext]{ref-Grasman-etal-2015}
+Grasman, J. M., Zayas, M. J., Page, R. L., \& Pins, G. D. (2015).
+Biomimetic scaffolds for regeneration of volumetric muscle loss in
+skeletal muscle injuries. \emph{Acta Biomaterialia}, \emph{25}, 2--15.
+\url{https://doi.org/10.1016/j.actbio.2015.07.038}
+
+\bibitem[\citeproctext]{ref-Passipieri-etal-2017}
+Passipieri, J. A., Baker, H. B., Siriwardane, M., Ellenburg, M. D.,
+Vadhavkar, M., Saul, J. M., et al. (2017). Keratin hydrogel enhances in
+vivo skeletal muscle function in a rat model of volumetric muscle loss.
+\emph{Tissue Engineering Part A}, \emph{23}, 556--571.
+\url{https://doi.org/10.1089/ten.tea.2016.0458}
+
+\bibitem[\citeproctext]{ref-patakyRegionofinterestAnalysesOnedimensional2016}
+Pataky, T., Robinson, M., \& Vanrenterghem, J. (2016).
+Region-of-interest analyses of onedimensional biomechanical
+trajectories: {Bridging 0D} and {1D} theory, augmenting statistical
+power. \emph{PeerJ}, \emph{4}, e2652.
+\url{https://doi.org/10.7717/peerj.2652}
+
+\bibitem[\citeproctext]{ref-Wu-etal-2012}
+Wu, X., Corona, B. T., Chen, X., \& Walters, T. J. (2012). A
+standardized rat model of volumetric muscle loss injury for the
+development of tissue engineering therapies. \emph{BioResearch Open
+Access}, \emph{1}(6), 280--290.
+\url{https://doi.org/10.1089/biores.2012.0271}
+
+\end{CSLReferences}
 
 
 
