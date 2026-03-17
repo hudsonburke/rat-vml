@@ -25,7 +25,6 @@ author:
       - University of Virginia
 date: last-modified
 number-sections: true
-jupyter: python3
 bibliography: references.bib
 ---
 
