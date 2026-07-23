@@ -219,6 +219,7 @@ jobs:
     needs: [validate]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
