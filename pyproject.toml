@@ -42,5 +42,8 @@ rerun-importer-c3d = { git = "https://github.com/hudsonburke/rerun-importer-c3d.
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

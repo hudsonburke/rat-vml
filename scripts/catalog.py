@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Treatment group mapping from AFIRM spreadsheet
 try:
-    from rathindlimb.analysis.subject_groups import SUBJECT_TO_GROUP
+    from rat_vml.analysis.subject_groups import SUBJECT_TO_GROUP
 except ImportError:
     SUBJECT_TO_GROUP = {}
 
@@ -50,7 +50,7 @@ def run_import(c3d_dir: str, output_dir: str, min_body_measurements: int = 3, gr
         Minimum body measurement params before stopping scan.
     group_map_path : str or None
         Path to JSON file mapping subject IDs to treatment groups.
-        If not provided, auto-generates from rathindlimb.analysis.subject_groups.
+        If not provided, auto-generates from rat_vml.analysis.subject_groups.
 
     Returns
     -------
@@ -151,7 +151,7 @@ def _query_events_from_files(
     min_events: int = 7,
 ) -> list[dict]:
     """Fallback: extract events directly from C3D files."""
-    from rathindlimb.analysis.events import extract_events_from_c3d, validate_walking_trial
+    from rat_vml.analysis.events import extract_events_from_c3d, validate_walking_trial
 
     rrd_path = Path(rrd_dir)
     # Find the original C3D files (assume they're in a sibling directory)
