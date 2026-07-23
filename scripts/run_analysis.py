@@ -10,11 +10,15 @@ Usage:
 Pipeline:
     1. Load subject metadata (group, mass, segment lengths)
     2. Scale the bilateral rat model to each subject's anthropometrics
-       (manual scale factors + Hicks regression for inertial properties)
-    3. Run Inverse Kinematics (IK)
-    4. Run Inverse Dynamics (ID)
-    5. Compute group means and run SPM
-    6. Generate manuscript figures
+       (rathindlimb.analysis.pipeline.scale_subject — manual scale factors
+        + Hicks regression for inertial properties)
+    3. Run Inverse Kinematics (rathindlimb.analysis.pipeline.run_ik)
+    4. Run Inverse Dynamics (rathindlimb.analysis.pipeline.run_id)
+    5. Aggregate group results and run SPM
+    6. Generate manuscript figures (rathindlimb.analysis.plots)
+
+The pipeline uses :mod:`rathindlimb.analysis` which composes osimpy's
+generic tool wrappers into rat-specific workflows.
 
 Data layout:
     <data-dir>/
