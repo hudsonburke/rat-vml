@@ -216,54 +216,74 @@ def build_subjects_csv(
     rrd_path = Path(rrd_dir)
     rows = []
 
-    # For each .rrd file, extract body measurements
-    # The .rrd files contain static scalars for body measurements
-    # We'll also look for the original C3D files to get PROCESSING params
-    c3d_dir = rrd_path.parent / "sourcedata"
-    if not c3d_dir.exists():
-        c3d_dir = rrd_path.parent / "raw"
+    # Extract body measurements from .rrd catalog
+    # Body measurements are stored as static scalars at
+    # {subject}/subject/body_measurements/{param}
+    try:
+        from rat_vml.analysis.queries import RerunCatalog
+        cat = RerunCatalog(rrd_path)
+        measurements = cat.body_measurements()
+        cat.close()
 
-    for rrd_file in sorted(rrd_path.glob("*.rrd")):
-        subject_id = rrd_file.stem
-        group = SUBJECT_TO_GROUP.get(subject_id, "")
+        if measurements.is_empty():
+            logger.warning("No body measurements found in .rrd catalog")
+            return Path(output_path)
 
-        # Find the corresponding C3D static trial
-        static_c3d = None
-        subject_c3d_dir = c3d_dir / subject_id
-        if subject_c3d_dir.exists():
-            static_files = sorted(subject_c3d_dir.glob("*Static*.c3d"))
-            if static_files:
-                static_c3d = static_files[0]
-            else:
-                # Look in session subdirectories
-                for session_dir in subject_c3d_dir.iterdir():
-                    if session_dir.is_dir():
-                        static_files = sorted(session_dir.glob("*Static*.c3d"))
-                        if static_files:
-                            static_c3d = static_files[0]
-                            break
+        # Pivot to wide format: one row per subject with all params
+        for subject in measurements["subject"].unique().sort():
+            group = SUBJECT_TO_GROUP.get(subject, "")
+            subj_data = measurements.filter(pl.col("subject") == subject)
 
-        if static_c3d is None:
-            logger.warning(f"No static C3D found for {subject_id}")
-            continue
+            row = {"Subject": subject, "Session": session, "Group": group}
+            for param_row in subj_data.iter_rows(named=True):
+                row[param_row["param"]] = param_row["value"]
+            rows.append(row)
+            logger.info(f"  {subject}: Group={group}")
 
-        # Extract body measurements from C3D PROCESSING parameters
-        try:
-            import ezc3d
-            c3d = ezc3d.c3d(str(static_c3d))
-            proc = c3d["parameters"].get("PROCESSING", {})
+    except Exception as e:
+        logger.warning(f"Failed to query .rrd catalog: {e}")
+        logger.info("Falling back to C3D file scanning")
 
-            params = {"Subject": subject_id, "Session": session, "Group": group}
-            for key in ["Mass", "RFemurLength", "RTibiaLength", "RFootLength",
-                         "LFemurLength", "LTibiaLength", "LFootLength"]:
-                if key in proc:
-                    val = proc[key]["value"]
-                    params[key] = val[0] if isinstance(val, (list, np.ndarray)) else val
+        # Fallback: read from C3D files if .rrd query fails
+        c3d_dir = rrd_path.parent / "sourcedata"
+        if not c3d_dir.exists():
+            c3d_dir = rrd_path.parent / "raw"
 
-            rows.append(params)
-            logger.info(f"  {subject_id}: Mass={params.get('Mass')}, Group={group}")
-        except Exception as e:
-            logger.warning(f"Failed to extract params from {static_c3d}: {e}")
+        for rrd_file in sorted(rrd_path.glob("*.rrd")):
+            subject_id = rrd_file.stem
+            group = SUBJECT_TO_GROUP.get(subject_id, "")
+
+            static_c3d = None
+            subject_c3d_dir = c3d_dir / subject_id
+            if subject_c3d_dir.exists():
+                static_files = sorted(subject_c3d_dir.glob("*Static*.c3d"))
+                if static_files:
+                    static_c3d = static_files[0]
+                else:
+                    for session_dir in subject_c3d_dir.iterdir():
+                        if session_dir.is_dir():
+                            static_files = sorted(session_dir.glob("*Static*.c3d"))
+                            if static_files:
+                                static_c3d = static_files[0]
+                                break
+
+            if static_c3d is None:
+                continue
+
+            try:
+                import ezc3d
+                c3d = ezc3d.c3d(str(static_c3d))
+                proc = c3d["parameters"].get("PROCESSING", {})
+                params = {"Subject": subject_id, "Session": session, "Group": group}
+                for key in ["Mass", "RFemurLength", "RTibiaLength", "RFootLength",
+                             "LFemurLength", "LTibiaLength", "LFootLength"]:
+                    if key in proc:
+                        val = proc[key]["value"]
+                        params[key] = val[0] if isinstance(val, (list, np.ndarray)) else val
+                rows.append(params)
+                logger.info(f"  {subject_id}: Mass={params.get('Mass')}, Group={group}")
+            except Exception as e:
+                logger.warning(f"Failed to extract params from {static_c3d}: {e}")
 
     if not rows:
         logger.error("No subject data found.")
