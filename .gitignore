@@ -3,15 +3,13 @@
 
 /.quarto/
 /_manuscript
-
-/agujournal2019.cls
-/trackchanges.sty
-
-/.luarc.json
-
-**/*.quarto_ipynb
-/data/
-
-/.venv/
-/.vscode/
 /_freeze/
+/index_files/
+
+# Generated analysis output
+data/ik/
+data/id/
+data/figures/
+
+# Environment
+.venv/

@@ -1,0 +1,34 @@
+[project]
+name = "rat-vml"
+version = "0.1.0"
+description = "Analysis of Volumetric Muscle Loss Injury and Treatments in the Rodent Lateral Gastrocnemius"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "opensim>=4.6",
+    "osimpy",
+    "polars",
+    "scipy",
+    "seaborn",
+    "spm1d",
+    "tsl-optimization",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter",
+    "pytest>=8",
+]
+
+[tool.uv.sources]
+osimpy = { git = "https://github.com/hudsonburke/osimpy.git" }
+tsl-optimization = { git = "https://github.com/hudsonburke/tsl-optimization.git" }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
