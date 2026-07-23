@@ -37,7 +37,7 @@ except ImportError:
     SUBJECT_TO_GROUP = {}
 
 
-def run_import(c3d_dir: str, output_dir: str, min_body_measurements: int = 3) -> dict[str, str]:
+def run_import(c3d_dir: str, output_dir: str, min_body_measurements: int = 3, group_map_path: str | None = None) -> dict[str, str]:
     """Import C3D files to .rrd using movedb-core's C3D importer.
 
     Parameters
@@ -48,15 +48,24 @@ def run_import(c3d_dir: str, output_dir: str, min_body_measurements: int = 3) ->
         Output directory for .rrd files.
     min_body_measurements : int
         Minimum body measurement params before stopping scan.
+    group_map_path : str or None
+        Path to JSON file mapping subject IDs to treatment groups.
+        If not provided, auto-generates from rathindlimb.analysis.subject_groups.
 
     Returns
     -------
     dict mapping subject_name → rrd_filepath
     """
-    from rerun_importer_c3d.batch import batch_import
+    from rerun_importer_c3d.batch import batch_import, load_group_map
+
+    # Auto-generate group map from subject_groups if not provided
+    group_map = load_group_map(group_map_path)
+    if not group_map and SUBJECT_TO_GROUP:
+        group_map = SUBJECT_TO_GROUP
+        logger.info(f"Auto-generated group map with {len(group_map)} subjects")
 
     logger.info(f"Importing C3D files from {c3d_dir} → {output_dir}")
-    results = batch_import(c3d_dir, output_dir, min_body_measurements)
+    results = batch_import(c3d_dir, output_dir, min_body_measurements, group_map=group_map)
     logger.info(f"Imported {len(results)} subjects")
     return results
 
@@ -317,6 +326,7 @@ def main():
     import_parser.add_argument("c3d_dir", help="Root directory with C3D files")
     import_parser.add_argument("-o", "--output-dir", default="data/rrd", help="Output .rrd directory")
     import_parser.add_argument("--min-body-measurements", type=int, default=3)
+    import_parser.add_argument("--group-map", default=None, help="JSON file mapping subject IDs to treatment groups (auto-generated from AFIRM spreadsheet if not provided)")
 
     # subjects
     subjects_parser = subparsers.add_parser("subjects", help="Build subjects.csv from catalog")
@@ -339,7 +349,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "import":
-        run_import(args.c3d_dir, args.output_dir, args.min_body_measurements)
+        run_import(args.c3d_dir, args.output_dir, args.min_body_measurements, args.group_map)
     elif args.command == "subjects":
         build_subjects_csv(args.rrd_dir, args.output, args.session)
     elif args.command == "query":
