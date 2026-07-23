@@ -137,43 +137,11 @@ def scale_model(
         scaled_model_name=f"{subject_name}_scaled.osim",
     )
 
-    scaled_path = output_dir / f"{subject_name}_scaled.osim"
-    if not scaled_path.exists():
-        raise RuntimeError(f"Scaling failed: {scaled_path} not created")
-    logger.info(f"Scaled model -> {scaled_path}")
-    return scaled_path
 
 
-def scale_from_c3d(
-    c3d_path: Path,
-    base_model_path: Path,
-    output_dir: Path,
-) -> Path:
-    """Scale model using anthropometrics embedded in a C3D static trial.
-
-    Reads PROCESSING parameters from the C3D file (Mass, femur/tibia lengths)
-    and passes them to the rathindlimb scaling pipeline.
-    """
-    from rathindlimb.scale import scaling_parameters_from_c3d, scale_opensim_model
-
-    params = scaling_parameters_from_c3d(str(c3d_path))
-    subject_name = c3d_path.stem
-
-    scale_opensim_model(
-        name=subject_name,
-        trc_file_name=str(c3d_path),
-        parameters=params,
-        output_dir=str(output_dir),
-    )
-
-    scaled_path = output_dir / f"{subject_name}_scaled.osim"
-    logger.info(f"Scaled model from C3D -> {scaled_path}")
-    return scaled_path
-
-
-# =========================================================================
-# Step 3: Run Inverse Kinematics
-# =========================================================================
+    # =========================================================================
+    # Step 3: Run Inverse Kinematics
+    # =========================================================================
 def run_ik(
     model_path: Path,
     trc_path: Path,
@@ -322,43 +290,35 @@ def main():
             "  python scripts/run_analysis.py --c3d data/raw/BAA01_static.c3d\n"
         ),
     )
-    parser.add_argument("--data-dir", type=Path, help="Directory with raw/, subjects.csv")
+    parser.add_argument("--data-dir", type=Path, help="Directory with rrd/, subjects.csv")
     parser.add_argument("--model", type=Path, help="Path to bilateral rat model (.osim)")
     parser.add_argument("--group", choices=TREATMENT_GROUPS, help="Process only one group")
-    parser.add_argument("--c3d", type=Path, help="Scale model from a single C3D static trial")
+    parser.add_argument("--session", default="Baseline", help="Session to analyze (e.g. Baseline, Week24)")
     parser.add_argument("--skip-ik", action="store_true", help="Skip IK (use cached)")
     parser.add_argument("--skip-id", action="store_true", help="Skip ID (use cached)")
     args = parser.parse_args()
 
-    # Single-subject scaling from C3D
-    if args.c3d:
-        model_path = args.model or PROJECT_ROOT / "models" / "rat_hindlimb_bilateral.osim"
-        output_dir = PROJECT_ROOT / "data" / "scaled_models"
-        scale_from_c3d(args.c3d, model_path, output_dir)
-        return
-
-    # Multi-subject pipeline
     data_dir = args.data_dir or PROJECT_ROOT / "data"
-    raw_dir = data_dir / "raw"
-    ik_dir = data_dir / "ik"
-    id_dir = data_dir / "id"
+    rrd_dir = data_dir / "rrd"
     figures_dir = data_dir / "figures"
     scaled_dir = data_dir / "scaled_models"
+    results_dir = data_dir / "results"
 
-    for d in [ik_dir, id_dir, figures_dir, scaled_dir]:
+    for d in [figures_dir, scaled_dir, results_dir]:
         d.mkdir(parents=True, exist_ok=True)
 
+    # Load subjects
     subjects = load_subjects(data_dir / "subjects.csv")
     if subjects.is_empty():
         logger.info(
             "No subjects.csv found. "
-            "Create one or use --c3d for single-subject scaling."
+            "Run 'python scripts/catalog.py subjects data/rrd/ -o data/subjects.csv' first."
         )
         return
 
+    # Find model
     model_path = args.model
     if model_path is None:
-        # Look for a bilateral model in common locations
         candidates = [
             PROJECT_ROOT / "models" / "rat_hindlimb_bilateral.osim",
             PROJECT_ROOT.parent / "rat-hindlimb-model" / "models" / "osim" / "rat_hindlimb_bilateral.osim",
@@ -371,11 +331,94 @@ def main():
         logger.error("Model not found; use --model to specify path")
         return
 
+    # Find .rrd catalog
+    if not rrd_dir.exists():
+        logger.error(f".rrd catalog not found at {rrd_dir}")
+        logger.info("Run 'python scripts/catalog.py import sourcedata/ -o data/rrd/' first")
+        return
+
+    session = args.session if hasattr(args, 'session') else "Baseline"
     logger.info(
         f"Pipeline: {len(subjects)} subjects, model={model_path.name}, "
+        f"session={session}, "
         f"groups={subjects['Group'].n_unique() if 'Group' in subjects.columns else 'N/A'}"
     )
-    logger.info("Run with --skip-ik --skip-id to regenerate figures from cached results")
+
+    # Run pipeline for each subject
+    from rat_vml.analysis.pipeline import run_subject, aggregate_group
+
+    group_results: dict[str, list] = {}
+
+    for row in subjects.iter_rows(named=True):
+        subject_id = row["Subject"]
+        group = row.get("Group", "")
+
+        # Filter by group if specified
+        if args.group and group != args.group:
+            continue
+
+        # Find the .rrd file for this subject
+        rrd_path = rrd_dir / f"{subject_id}.rrd"
+        if not rrd_path.exists():
+            logger.warning(f"No .rrd file found for {subject_id}")
+            continue
+
+        subject_out = results_dir / subject_id
+        subject_out.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Processing {subject_id} ({group})")
+
+        try:
+            result = run_subject(
+                base_model=model_path,
+                subject_id=subject_id,
+                session=session,
+                group=group,
+                rrd_path=rrd_path,
+                output_dir=subject_out,
+                skip_scaling=args.skip_ik,
+                skip_ik=args.skip_ik,
+                skip_id=args.skip_id,
+            )
+
+            if result.success:
+                logger.info(f"  ✓ {subject_id}: {len(result.trial_results)} trials")
+                if group not in group_results:
+                    group_results[group] = []
+                group_results[group].append(result)
+            else:
+                logger.warning(f"  ✗ {subject_id}: {result.errors}")
+
+        except Exception as e:
+            logger.error(f"  ✗ {subject_id}: {e}")
+
+    # Aggregate and plot
+    if group_results:
+        logger.info(f"\nAggregating results for {len(group_results)} groups...")
+        from rat_vml.analysis.plots import generate_all_figures
+        from rat_vml.analysis.defaults import COORD_NAMES, MOMENT_NAMES
+
+        aggregated = {}
+        for group_name, results in group_results.items():
+            agg = aggregate_group(results, group_name)
+            aggregated[group_name] = agg
+            logger.info(
+                f"  {group_name}: {agg.n_subjects} subjects, "
+                f"{'IK data available' if agg.ik_mean is not None else 'no IK data'}"
+            )
+
+        # Generate figures
+        control = aggregated.get("Control")
+        if control:
+            figure_paths = generate_all_figures(
+                aggregated, "Control", figures_dir,
+                COORD_NAMES, MOMENT_NAMES,
+            )
+            logger.info(f"\nGenerated {len(figure_paths)} figures in {figures_dir}")
+        else:
+            logger.warning("No Control group found for reference plots")
+    else:
+        logger.info("No successful results to aggregate")
 
 
 if __name__ == "__main__":

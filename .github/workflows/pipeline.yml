@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
       - 'scripts/**'
       - 'chapters/**'
       - 'pyproject.toml'
@@ -50,16 +51,27 @@ jobs:
       - name: Validate project structure
         run: |
           uv run python -c "
-          from rathindlimb.analysis.subject_groups import SUBJECT_TO_GROUP
+          from rat_vml.analysis.subject_groups import SUBJECT_TO_GROUP
           print(f'Subject groups loaded: {len(SUBJECT_TO_GROUP)} subjects')
           assert len(SUBJECT_TO_GROUP) > 50, f'Expected 50+ subjects, got {len(SUBJECT_TO_GROUP)}'
           print('✓ Subject groups validated')
           "
 
+      - name: Validate analysis module imports
+        run: |
+          uv run python -c "
+          from rat_vml.analysis.events import GaitEvents, validate_walking_trial
+          from rat_vml.analysis.io import rrd_to_trc, rrd_to_fp_mot
+          from rat_vml.analysis.pipeline import run_subject, aggregate_group
+          from rat_vml.analysis.plots import plot_kinematics, plot_kinetics
+          from rat_vml.analysis.queries import RerunCatalog
+          print('✓ All analysis module imports validated')
+          "
+
   # ----------------------------------------------------------------
-  # Job 2: Build subjects.csv from HuggingFace data
+  # Job 2: MoveDB catalog import + subjects.csv
   # ----------------------------------------------------------------
-  prep-data:
+  catalog-import:
     needs: validate
     runs-on: ubuntu-latest
     steps:
@@ -80,79 +92,10 @@ jobs:
         id: cache-hf
         with:
           path: ~/.cache/huggingface
-          key: hf-rat-mocap-${{ hashFiles('scripts/prep_data.py') }}
+          key: hf-rat-mocap-${{ hashFiles('scripts/catalog.py') }}
           restore-keys: hf-rat-mocap-
 
       - name: Download C3D data from HuggingFace
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          uv run python -c "
-          from huggingface_hub import login, hf_hub_download
-          import os
-          token = os.environ.get('HF_TOKEN')
-          if token:
-              login(token)
-          # Download a representative subset for CI testing
-          for subject in ['BAA01', 'BAA02', 'BAA03']:
-              for session in ['Baseline', 'Week04']:
-                  try:
-                      hf_hub_download(
-                          'hudsonburke/rat-hindlimb-mocap',
-                          f'sourcedata/{subject}/{session}.tar.gz',
-                          repo_type='dataset',
-                          local_dir='data/raw',
-                          local_dir_use_symlinks=False,
-                      )
-                      print(f'Downloaded {subject}/{session}')
-                  except Exception as e:
-                      print(f'Skipping {subject}/{session}: {e}')
-          "
-
-      - name: Extract tar.gz archives
-        run: |
-          for f in data/raw/sourcedata/*/*.tar.gz; do
-            subject=$(basename $(dirname $f))
-            mkdir -p "data/raw/sourcedata/$subject"
-            tar xzf "$f" -C "data/raw/sourcedata/$subject/" 2>/dev/null || true
-          done
-          find data/raw/sourcedata -name "*.c3d" | head -20
-
-      - name: Build subjects.csv
-        run: |
-          uv run python scripts/prep_data.py \
-            --c3d-dir data/raw/sourcedata \
-            --output data/subjects.csv \
-            --dry-run 2>&1 | tee prep.log
-          echo "Subject count: $(grep -c 'Mass=' prep.log || echo 0)"
-
-      - name: Upload subjects.csv
-        uses: actions/upload-artifact@v4
-        with:
-          name: subjects-csv
-          path: data/subjects.csv
-          if-no-files-found: ignore
-
-  # ----------------------------------------------------------------
-  # Job 3: MoveDB catalog import
-  # ----------------------------------------------------------------
-  catalog-import:
-    needs: prep-data
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: uv sync --extra movedb
-
-      - name: Download C3D data
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
@@ -162,6 +105,7 @@ jobs:
           token = os.environ.get('HF_TOKEN')
           if token:
               login(token)
+          # Download a representative subset for CI testing
           for subject in ['BAA01', 'BAA02', 'BAA03']:
               for session in ['Baseline']:
                   try:
@@ -170,12 +114,13 @@ jobs:
                           f'sourcedata/{subject}/{session}.tar.gz',
                           repo_type='dataset',
                           local_dir='data/raw',
+                          local_dir_use_symlinks=False,
                       )
                       with tarfile.open(path) as t:
                           t.extractall(f'data/raw/sourcedata/{subject}/')
                       print(f'Extracted {subject}/{session}')
                   except Exception as e:
-                      print(f'Skipping: {e}')
+                      print(f'Skipping {subject}/{session}: {e}')
           "
 
       - name: Import C3D to MoveDB catalog
@@ -186,24 +131,34 @@ jobs:
           echo "=== .rrd files ==="
           ls -lh data/rrd/*.rrd 2>/dev/null || echo "No .rrd files"
 
+      - name: Build subjects.csv from catalog
+        run: |
+          uv run python scripts/catalog.py subjects \
+            data/rrd/ \
+            -o data/subjects.csv 2>&1 | tee subjects.log
+          echo "=== subjects.csv ==="
+          head -5 data/subjects.csv 2>/dev/null || echo "No subjects.csv"
+
       - name: Query catalog for valid trials
         run: |
           uv run python scripts/catalog.py query data/rrd/ --side right 2>&1 || \
             echo "Query skipped (DuckDB rrd extension not available in CI)"
 
-      - name: Upload catalog
+      - name: Upload catalog and subjects
         uses: actions/upload-artifact@v4
         with:
-          name: rrd-catalog
-          path: data/rrd/
+          name: catalog-data
+          path: |
+            data/rrd/
+            data/subjects.csv
           if-no-files-found: ignore
           retention-days: 7
 
   # ----------------------------------------------------------------
-  # Job 4: Run analysis pipeline (needs model + data)
+  # Job 3: Run analysis pipeline (manual dispatch only)
   # ----------------------------------------------------------------
   analysis:
-    needs: prep-data
+    needs: catalog-import
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     steps:
@@ -229,31 +184,11 @@ jobs:
             /tmp/model
           ls /tmp/model/models/osim/rat_hindlimb_bilateral.osim
 
-      - name: Download C3D data
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          uv run python -c "
-          from huggingface_hub import login, hf_hub_download
-          import os, tarfile
-          token = os.environ.get('HF_TOKEN')
-          if token:
-              login(token)
-          for subject in ['BAA01', 'BAA02']:
-              for session in ['Baseline']:
-                  try:
-                      path = hf_hub_download(
-                          'hudsonburke/rat-hindlimb-mocap',
-                          f'sourcedata/{subject}/{session}.tar.gz',
-                          repo_type='dataset',
-                          local_dir='data/raw',
-                      )
-                      with tarfile.open(path) as t:
-                          t.extractall(f'data/raw/sourcedata/{subject}/')
-                      print(f'Extracted {subject}/{session}')
-                  except Exception as e:
-                      print(f'Skipping: {e}')
-          "
+      - name: Download catalog data from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: catalog-data
+          path: data/
 
       - name: Run analysis pipeline
         run: |
@@ -278,7 +213,7 @@ jobs:
           if-no-files-found: ignore
 
   # ----------------------------------------------------------------
-  # Job 5: Render manuscript
+  # Job 4: Render manuscript
   # ----------------------------------------------------------------
   render:
     needs: [validate]
