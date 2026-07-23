@@ -5,11 +5,13 @@ description = "Analysis of Volumetric Muscle Loss Injury and Treatments in the R
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "ezc3d",
     "matplotlib",
     "numpy",
     "opensim>=4.6",
     "osimpy",
     "polars",
+    "rathindlimb",
     "scipy",
     "seaborn",
     "spm1d",
@@ -24,6 +26,7 @@ dev = [
 
 [tool.uv.sources]
 osimpy = { git = "https://github.com/hudsonburke/osimpy.git" }
+rathindlimb = { git = "https://github.com/hudsonburke/rat-hindlimb-model.git" }
 tsl-optimization = { git = "https://github.com/hudsonburke/tsl-optimization.git" }
 
 [build-system]
