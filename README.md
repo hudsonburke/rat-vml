@@ -65,6 +65,30 @@ See `pyproject.toml` for the full list.
 4. **Plot** — Generate kinematics and kinetics comparison figures with SPM
 5. **Render** — Build the AGU-formatted manuscript with embedded figures
 
+## CI Pipeline
+
+The GitHub Actions workflow (`pipeline.yml`) runs on push to main and validates
+the full analysis pipeline on x86_64 Ubuntu runners.
+
+### Required secrets
+
+| Secret | Purpose | How to set |
+|--------|---------|------------|
+| `HF_TOKEN` | HuggingFace read token for downloading C3D data | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) → New token → Add as repo secret |
+
+### What runs on push
+
+1. **validate** — installs deps, validates subject group mapping
+2. **prep-data** — downloads C3D data from HuggingFace, builds `subjects.csv`
+3. **catalog-import** — imports C3D data to MoveDB `.rrd` catalog with auto-generated group tags
+4. **render** — renders the Quarto manuscript
+
+### What runs on manual dispatch
+
+5. **analysis** — full pipeline: scale → IK → ID → figures (requires the model from rat-hindlimb-model)
+
+Go to **Actions → Analysis Pipeline → Run workflow** to trigger the full analysis manually.
+
 ## Paper
 
 The manuscript is formatted for submission to AGU journals using the

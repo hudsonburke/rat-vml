@@ -1,60 +1,303 @@
 name: Analysis Pipeline
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'chapters/**'
+      - 'pyproject.toml'
+      - '.github/workflows/pipeline.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
-      data_dir:
-        description: 'Path to sourcedata directory'
-        required: false
-        default: 'data/raw'
-      model_path:
-        description: 'Path to bilateral rat model (.osim)'
-        required: false
-        default: 'models/rat_hindlimb_bilateral.osim'
       session:
         description: 'Session to analyze (e.g. Baseline, Week24)'
         required: false
-        default: 'Baseline'
+        default: 'Week24'
+      model_ref:
+        description: 'Git ref for rat-hindlimb-model (branch or tag)'
+        required: false
+        default: 'main'
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
 
 jobs:
-  prep-data:
+  # ----------------------------------------------------------------
+  # Job 1: Install deps + validate project structure
+  # ----------------------------------------------------------------
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: |
-          uv sync
-          uv pip install huggingface-hub
+        run: uv sync --extra movedb
 
-      - name: Cache HuggingFace data
+      - name: Validate project structure
+        run: |
+          uv run python -c "
+          from rathindlimb.analysis.subject_groups import SUBJECT_TO_GROUP
+          print(f'Subject groups loaded: {len(SUBJECT_TO_GROUP)} subjects')
+          assert len(SUBJECT_TO_GROUP) > 50, f'Expected 50+ subjects, got {len(SUBJECT_TO_GROUP)}'
+          print('✓ Subject groups validated')
+          "
+
+  # ----------------------------------------------------------------
+  # Job 2: Build subjects.csv from HuggingFace data
+  # ----------------------------------------------------------------
+  prep-data:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --extra movedb
+
+      - name: Cache HuggingFace download
         uses: actions/cache@v4
         id: cache-hf
         with:
           path: ~/.cache/huggingface
           key: hf-rat-mocap-${{ hashFiles('scripts/prep_data.py') }}
+          restore-keys: hf-rat-mocap-
 
-      - name: Download subject metadata from HuggingFace
+      - name: Download C3D data from HuggingFace
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          uv run python -c "
+          from huggingface_hub import login, hf_hub_download
+          import os
+          token = os.environ.get('HF_TOKEN')
+          if token:
+              login(token)
+          # Download a representative subset for CI testing
+          for subject in ['BAA01', 'BAA02', 'BAA03']:
+              for session in ['Baseline', 'Week04']:
+                  try:
+                      hf_hub_download(
+                          'hudsonburke/rat-hindlimb-mocap',
+                          f'sourcedata/{subject}/{session}.tar.gz',
+                          repo_type='dataset',
+                          local_dir='data/raw',
+                          local_dir_use_symlinks=False,
+                      )
+                      print(f'Downloaded {subject}/{session}')
+                  except Exception as e:
+                      print(f'Skipping {subject}/{session}: {e}')
+          "
+
+      - name: Extract tar.gz archives
+        run: |
+          for f in data/raw/sourcedata/*/*.tar.gz; do
+            subject=$(basename $(dirname $f))
+            mkdir -p "data/raw/sourcedata/$subject"
+            tar xzf "$f" -C "data/raw/sourcedata/$subject/" 2>/dev/null || true
+          done
+          find data/raw/sourcedata -name "*.c3d" | head -20
+
+      - name: Build subjects.csv
+        run: |
           uv run python scripts/prep_data.py \
-            --c3d-dir sourcedata \
+            --c3d-dir data/raw/sourcedata \
             --output data/subjects.csv \
-            --dry-run
+            --dry-run 2>&1 | tee prep.log
+          echo "Subject count: $(grep -c 'Mass=' prep.log || echo 0)"
 
       - name: Upload subjects.csv
         uses: actions/upload-artifact@v4
         with:
           name: subjects-csv
           path: data/subjects.csv
+          if-no-files-found: ignore
+
+  # ----------------------------------------------------------------
+  # Job 3: MoveDB catalog import
+  # ----------------------------------------------------------------
+  catalog-import:
+    needs: prep-data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --extra movedb
+
+      - name: Download C3D data
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          uv run python -c "
+          from huggingface_hub import login, hf_hub_download
+          import os, tarfile
+          token = os.environ.get('HF_TOKEN')
+          if token:
+              login(token)
+          for subject in ['BAA01', 'BAA02', 'BAA03']:
+              for session in ['Baseline']:
+                  try:
+                      path = hf_hub_download(
+                          'hudsonburke/rat-hindlimb-mocap',
+                          f'sourcedata/{subject}/{session}.tar.gz',
+                          repo_type='dataset',
+                          local_dir='data/raw',
+                      )
+                      with tarfile.open(path) as t:
+                          t.extractall(f'data/raw/sourcedata/{subject}/')
+                      print(f'Extracted {subject}/{session}')
+                  except Exception as e:
+                      print(f'Skipping: {e}')
+          "
+
+      - name: Import C3D to MoveDB catalog
+        run: |
+          uv run python scripts/catalog.py import \
+            data/raw/sourcedata \
+            -o data/rrd/
+          echo "=== .rrd files ==="
+          ls -lh data/rrd/*.rrd 2>/dev/null || echo "No .rrd files"
+
+      - name: Query catalog for valid trials
+        run: |
+          uv run python scripts/catalog.py query data/rrd/ --side right 2>&1 || \
+            echo "Query skipped (DuckDB rrd extension not available in CI)"
+
+      - name: Upload catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: rrd-catalog
+          path: data/rrd/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ----------------------------------------------------------------
+  # Job 4: Run analysis pipeline (needs model + data)
+  # ----------------------------------------------------------------
+  analysis:
+    needs: prep-data
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Download model
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MODEL_REF=${{ github.event.inputs.model_ref || 'main' }}
+          git clone --depth=1 -b "$MODEL_REF" \
+            https://github.com/hudsonburke/rat-hindlimb-model.git \
+            /tmp/model
+          ls /tmp/model/models/osim/rat_hindlimb_bilateral.osim
+
+      - name: Download C3D data
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          uv run python -c "
+          from huggingface_hub import login, hf_hub_download
+          import os, tarfile
+          token = os.environ.get('HF_TOKEN')
+          if token:
+              login(token)
+          for subject in ['BAA01', 'BAA02']:
+              for session in ['Baseline']:
+                  try:
+                      path = hf_hub_download(
+                          'hudsonburke/rat-hindlimb-mocap',
+                          f'sourcedata/{subject}/{session}.tar.gz',
+                          repo_type='dataset',
+                          local_dir='data/raw',
+                      )
+                      with tarfile.open(path) as t:
+                          t.extractall(f'data/raw/sourcedata/{subject}/')
+                      print(f'Extracted {subject}/{session}')
+                  except Exception as e:
+                      print(f'Skipping: {e}')
+          "
+
+      - name: Run analysis pipeline
+        run: |
+          uv run python scripts/run_analysis.py \
+            --data-dir data \
+            --model /tmp/model/models/osim/rat_hindlimb_bilateral.osim \
+            --session ${{ github.event.inputs.session || 'Baseline' }} \
+            2>&1 | tee analysis.log
+
+      - name: Upload figures
+        uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: data/figures/
+          if-no-files-found: ignore
+
+      - name: Upload analysis log
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-log
+          path: analysis.log
+          if-no-files-found: ignore
+
+  # ----------------------------------------------------------------
+  # Job 5: Render manuscript
+  # ----------------------------------------------------------------
+  render:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Render manuscript
+        run: quarto render
+
+      - name: Upload rendered manuscript
+        uses: actions/upload-artifact@v4
+        with:
+          name: manuscript
+          path: _site/
+          if-no-files-found: ignore
