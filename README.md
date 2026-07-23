@@ -29,14 +29,20 @@ cd rat-vml
 # Install dependencies
 uv sync
 
-# Place motion data in data/raw/ and create data/subjects.csv, then:
-uv run python scripts/run_analysis.py
+# Optionally install MoveDB integration
+uv sync --extra movedb
 
-# Regenerate only figures from cached IK/ID results:
+# Import C3D data to .rrd catalog
+uv run python scripts/catalog.py import /path/to/sourcedata -o data/rrd/
+
+# Build subjects.csv from catalog (tags subjects with treatment groups)
+uv run python scripts/catalog.py subjects data/rrd/ -o data/subjects.csv
+
+# Run the full analysis pipeline
+uv run python scripts/run_analysis.py --data-dir data --model ../rat-hindlimb-model/models/osim/rat_hindlimb_bilateral.osim
+
+# Regenerate only figures from cached IK/ID results
 uv run python scripts/run_analysis.py --skip-ik --skip-id
-
-# Process a single treatment group:
-uv run python scripts/run_analysis.py --group NR
 
 # Render the manuscript
 quarto render

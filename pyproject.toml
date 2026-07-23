@@ -5,6 +5,7 @@ description = "Analysis of Volumetric Muscle Loss Injury and Treatments in the R
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "duckdb>=1.0.0",
     "ezc3d",
     "matplotlib",
     "numpy",
@@ -12,6 +13,7 @@ dependencies = [
     "osimpy",
     "polars",
     "rathindlimb",
+    "rerun-sdk>=0.34.0",
     "scipy",
     "seaborn",
     "spm1d",
@@ -24,10 +26,17 @@ dev = [
     "pytest>=8",
 ]
 
+movedb = [
+    "movedb-core[c3d]>=0.2.0",
+    "rerun-importer-c3d>=0.1.0",
+]
+
 [tool.uv.sources]
 osimpy = { git = "https://github.com/hudsonburke/osimpy.git" }
 rathindlimb = { git = "https://github.com/hudsonburke/rat-hindlimb-model.git" }
 tsl-optimization = { git = "https://github.com/hudsonburke/tsl-optimization.git" }
+movedb-core = { git = "https://github.com/hudsonburke/movedb-core.git" }
+rerun-importer-c3d = { git = "https://github.com/hudsonburke/rerun-importer-c3d.git" }
 
 [build-system]
 requires = ["setuptools>=68"]
