@@ -1,0 +1,60 @@
+name: Analysis Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_dir:
+        description: 'Path to sourcedata directory'
+        required: false
+        default: 'data/raw'
+      model_path:
+        description: 'Path to bilateral rat model (.osim)'
+        required: false
+        default: 'models/rat_hindlimb_bilateral.osim'
+      session:
+        description: 'Session to analyze (e.g. Baseline, Week24)'
+        required: false
+        default: 'Baseline'
+
+jobs:
+  prep-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv pip install huggingface-hub
+
+      - name: Cache HuggingFace data
+        uses: actions/cache@v4
+        id: cache-hf
+        with:
+          path: ~/.cache/huggingface
+          key: hf-rat-mocap-${{ hashFiles('scripts/prep_data.py') }}
+
+      - name: Download subject metadata from HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          uv run python scripts/prep_data.py \
+            --c3d-dir sourcedata \
+            --output data/subjects.csv \
+            --dry-run
+
+      - name: Upload subjects.csv
+        uses: actions/upload-artifact@v4
+        with:
+          name: subjects-csv
+          path: data/subjects.csv
