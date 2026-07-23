@@ -27,7 +27,10 @@ dev = [
     "pytest>=8",
 ]
 
-movedb = [
+# Workstation-only deps for C3D → .rrd conversion.
+# CI does NOT need these — it downloads pre-built .rrd files from HuggingFace.
+ingest = [
+    "ezc3d",
     "movedb-core[c3d]>=0.2.0",
     "rerun-importer-c3d>=0.1.0",
 ]

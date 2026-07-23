@@ -9,12 +9,14 @@ biomechanical outcomes across seven treatment groups after VML injury in rats.
 
 ```
 scripts/
+  ingest.py            # One-time C3D → .rrd conversion (workstation only)
+  catalog.py           # MoveDB catalog queries (subjects, trials, events)
   run_analysis.py      # Main analysis pipeline (scale → IK → ID → plots)
+src/rat_vml/analysis/  # Analysis module (events, forces, io, pipeline, plots, queries)
 data/
-  raw/                 # Raw motion capture data (C3D/TRC) — not tracked in git
-  subjects.csv         # Subject metadata (group, mass, limb lengths)
-  ik/                  # IK results (generated)
-  id/                  # ID results (generated)
+  rrd/                 # Pre-built .rrd catalog (downloaded from HuggingFace)
+  subjects.csv         # Subject metadata (group, mass, limb lengths) — generated
+  results/             # IK/ID results per subject (generated)
   figures/             # Output figures (generated)
 images/                # Manuscript figures (committed for Quarto render)
 _extensions/           # AGU journal Quarto extension
@@ -29,11 +31,8 @@ cd rat-vml
 # Install dependencies
 uv sync
 
-# Optionally install MoveDB integration
-uv sync --extra movedb
-
-# Import C3D data to .rrd catalog
-uv run python scripts/catalog.py import /path/to/sourcedata -o data/rrd/
+# Download pre-built .rrd catalog from HuggingFace
+uv run python scripts/ingest.py pull
 
 # Build subjects.csv from catalog (tags subjects with treatment groups)
 uv run python scripts/catalog.py subjects data/rrd/ -o data/subjects.csv
@@ -41,11 +40,24 @@ uv run python scripts/catalog.py subjects data/rrd/ -o data/subjects.csv
 # Run the full analysis pipeline
 uv run python scripts/run_analysis.py --data-dir data --model ../rat-hindlimb-model/models/osim/rat_hindlimb_bilateral.osim
 
-# Regenerate only figures from cached IK/ID results
-uv run python scripts/run_analysis.py --skip-ik --skip-id
-
 # Render the manuscript
 quarto render
+```
+
+## C3D Ingestion (one-time, workstation only)
+
+The `.rrd` catalog files are pre-built and stored in the HuggingFace dataset.
+To rebuild them from raw C3D data (requires x86_64 machine with ezc3d):
+
+```shell
+# Install workstation-only deps
+uv sync --extra ingest
+
+# Convert C3D to .rrd
+uv run python scripts/ingest.py convert --c3d-dir /path/to/sourcedata -o data/rrd/
+
+# Push updated .rrd files to HuggingFace
+uv run python scripts/ingest.py push --rrd-dir data/rrd/
 ```
 
 ## Dependencies
@@ -53,39 +65,42 @@ quarto render
 - **OpenSim 4.6+** (PyPI wheel, Python 3.12–3.13)
 - **osimpy** — Pythonic OpenSim tool wrappers (git dependency)
 - **tsl-optimization** — tendon slack length optimization (git dependency)
+- **rathindlimb** — rat model scaling code (git dependency)
 - **spm1d** — Statistical Parametric Mapping for 1D data (group comparisons)
 
 See `pyproject.toml` for the full list.
 
 ## Pipeline
 
-1. **Scale** — Subject-specific scaling of the bilateral rat model
-2. **IK** — Inverse Kinematics to compute joint angles from marker trajectories
-3. **ID** — Inverse Dynamics to compute joint moments from kinematics + GRF
-4. **Plot** — Generate kinematics and kinetics comparison figures with SPM
-5. **Render** — Build the AGU-formatted manuscript with embedded figures
+```
+.rdd catalog ← DuckDB query → find valid walking trials (7 events, no gaps)
+       ↓
+For selected trials: extract markers/forces from .rrd → write TRC/MOT
+       ↓
+Scale → IK → ID → spline to stance+swing → group aggregation → figures
+```
+
+The `.rrd` files are the single source of truth. No C3D reading after ingestion.
 
 ## CI Pipeline
 
-The GitHub Actions workflow (`pipeline.yml`) runs on push to main and validates
-the full analysis pipeline on x86_64 Ubuntu runners.
+The GitHub Actions workflow (`pipeline.yml`) runs on push to main.
 
 ### Required secrets
 
 | Secret | Purpose | How to set |
 |--------|---------|------------|
-| `HF_TOKEN` | HuggingFace read token for downloading C3D data | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) → New token → Add as repo secret |
+| `HF_TOKEN` | HuggingFace read token for downloading .rrd files | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) → New token → Add as repo secret |
 
 ### What runs on push
 
-1. **validate** — installs deps, validates subject group mapping
-2. **prep-data** — downloads C3D data from HuggingFace, builds `subjects.csv`
-3. **catalog-import** — imports C3D data to MoveDB `.rrd` catalog with auto-generated group tags
-4. **render** — renders the Quarto manuscript
+1. **validate** — installs deps, validates subject group mapping and module imports
+2. **catalog** — downloads `.rrd` files from HuggingFace, builds `subjects.csv`, queries for valid trials
+3. **render** — renders the Quarto manuscript (non-blocking)
 
 ### What runs on manual dispatch
 
-5. **analysis** — full pipeline: scale → IK → ID → figures (requires the model from rat-hindlimb-model)
+4. **analysis** — full pipeline: scale → IK → ID → figures (requires the model from rat-hindlimb-model)
 
 Go to **Actions → Analysis Pipeline → Run workflow** to trigger the full analysis manually.
 
