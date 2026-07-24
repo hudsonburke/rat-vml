@@ -68,23 +68,21 @@ def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None
 
     if tar_files and not c3d_files:
         # Extract tar.gz archives to a temporary directory
+        # Each archive contains a session directory (e.g. Baseline/Walk01.c3d),
+        # so extract directly under the subject directory
         extract_dir = Path(output_dir) / ".extracted"
         extract_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Found {len(tar_files)} .tar.gz archives, extracting to {extract_dir}")
 
         for tar_file in tar_files:
-            # sourcedata/{subject}/{session}.tar.gz → extract to {subject}/{session}/
+            # sourcedata/{subject}/{session}.tar.gz → extract to {subject}/
             subject_dir = tar_file.parent.name
-            session_name = tar_file.stem
-            dest = extract_dir / subject_dir / session_name
-            if dest.exists():
-                logger.info(f"  Skipping {subject_dir}/{session_name} (already extracted)")
-                continue
+            dest = extract_dir / subject_dir
             dest.mkdir(parents=True, exist_ok=True)
             try:
                 with tarfile.open(tar_file) as t:
                     t.extractall(dest, filter="data")
-                logger.info(f"  Extracted {subject_dir}/{session_name}")
+                logger.info(f"  Extracted {subject_dir}/{tar_file.stem}")
             except Exception as e:
                 logger.warning(f"  Failed to extract {tar_file}: {e}")
 
