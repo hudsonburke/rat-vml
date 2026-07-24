@@ -35,7 +35,13 @@ def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None
 
     This runs on the workstation and requires ezc3d + rerun-importer-c3d.
     Use --workers N to process N subjects in parallel.
+
+    If the c3d_dir contains .tar.gz archives, they are extracted first
+    to a temporary directory before ingestion.
     """
+    import tarfile
+    import tempfile
+
     try:
         from rerun_importer_c3d.batch import batch_import, load_group_map
     except ImportError:
@@ -54,6 +60,36 @@ def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None
     if not group_map and SUBJECT_TO_GROUP:
         group_map = SUBJECT_TO_GROUP
         logger.info(f"Auto-generated group map with {len(group_map)} subjects")
+
+    # Check if c3d_dir contains .tar.gz archives that need extraction
+    c3d_path = Path(c3d_dir)
+    tar_files = sorted(c3d_path.rglob("*.tar.gz"))
+    c3d_files = sorted(c3d_path.rglob("*.c3d"))
+
+    if tar_files and not c3d_files:
+        # Extract tar.gz archives to a temporary directory
+        extract_dir = Path(output_dir) / ".extracted"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Found {len(tar_files)} .tar.gz archives, extracting to {extract_dir}")
+
+        for tar_file in tar_files:
+            # sourcedata/{subject}/{session}.tar.gz → extract to {subject}/{session}/
+            subject_dir = tar_file.parent.name
+            session_name = tar_file.stem
+            dest = extract_dir / subject_dir / session_name
+            if dest.exists():
+                logger.info(f"  Skipping {subject_dir}/{session_name} (already extracted)")
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            try:
+                with tarfile.open(tar_file) as t:
+                    t.extractall(dest, filter="data")
+                logger.info(f"  Extracted {subject_dir}/{session_name}")
+            except Exception as e:
+                logger.warning(f"  Failed to extract {tar_file}: {e}")
+
+        c3d_dir = str(extract_dir)
+        logger.info(f"Extraction complete, ingesting from {c3d_dir}")
 
     logger.info(f"Converting C3D files from {c3d_dir} → {output_dir} (workers={workers})")
     results = batch_import(c3d_dir, output_dir, group_map=group_map, workers=workers)
