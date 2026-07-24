@@ -1,24 +1,15 @@
-"""One-time C3D → .rrd ingestion for the workstation.
+"""One-time ingestion helpers for the HF dataset.
 
-Run this on an x86_64 machine with ezc3d and the Rerun C3D importer installed.
-It converts all C3D files to .rrd and optionally pushes them to HuggingFace
-so CI can download the .rrd files directly (no C3D conversion needed).
+This script handles downloading and uploading .rrd files.
+C3D → .rrd conversion lives in the HF dataset repo (scripts/convert.py).
 
 Usage::
 
-    # Convert C3D to .rrd (run once on workstation)
-    uv run --extra ingest python scripts/ingest.py convert \\
-        --c3d-dir /path/to/sourcedata \\
-        --output data/rrd/
+    # Download .rrd files from HuggingFace (CI or fresh clone)
+    uv run python scripts/ingest.py pull -o data/rrd/
 
-    # Push .rrd files to HuggingFace dataset
-    uv run --extra ingest python scripts/ingest.py push \\
-        --rrd-dir data/rrd/ \\
-        --repo hudsonburke/rat-hindlimb-mocap
-
-    # Download .rrd files from HuggingFace (used by CI)
-    uv run python scripts/ingest.py pull \\
-        --output data/rrd/
+    # Push .rrd files to HuggingFace (after running convert.py)
+    uv run python scripts/ingest.py push --rrd-dir data/rrd/
 """
 
 import argparse
@@ -29,76 +20,11 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None = None, workers: int = 1) -> None:
-    """Convert C3D files to .rrd using rerun-importer-c3d batch mode.
-
-    This runs on the workstation and requires ezc3d + rerun-importer-c3d.
-    Use --workers N to process N subjects in parallel.
-
-    If the c3d_dir contains .tar.gz archives, they are extracted first
-    to a temporary directory before ingestion.
-    """
-    import tarfile
-    import tempfile
-
-    try:
-        from rerun_importer_c3d.batch import batch_import, load_group_map
-    except ImportError:
-        raise ImportError(
-            "rerun-importer-c3d is required for C3D ingestion. "
-            "Install with: uv sync --extra ingest"
-        )
-
-    try:
-        from rat_vml.analysis.subject_groups import SUBJECT_TO_GROUP
-    except ImportError:
-        SUBJECT_TO_GROUP = {}
-
-    # Load or auto-generate group map
-    group_map = load_group_map(group_map_path)
-    if not group_map and SUBJECT_TO_GROUP:
-        group_map = SUBJECT_TO_GROUP
-        logger.info(f"Auto-generated group map with {len(group_map)} subjects")
-
-    # Check if c3d_dir contains .tar.gz archives that need extraction
-    c3d_path = Path(c3d_dir)
-    tar_files = sorted(c3d_path.rglob("*.tar.gz"))
-    c3d_files = sorted(c3d_path.rglob("*.c3d"))
-
-    if tar_files and not c3d_files:
-        # Extract tar.gz archives to a temporary directory
-        # Each archive contains a session directory (e.g. Baseline/Walk01.c3d),
-        # so extract directly under the subject directory
-        extract_dir = Path(output_dir) / ".extracted"
-        extract_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Found {len(tar_files)} .tar.gz archives, extracting to {extract_dir}")
-
-        for tar_file in tar_files:
-            # sourcedata/{subject}/{session}.tar.gz → extract to {subject}/
-            subject_dir = tar_file.parent.name
-            dest = extract_dir / subject_dir
-            dest.mkdir(parents=True, exist_ok=True)
-            try:
-                with tarfile.open(tar_file) as t:
-                    t.extractall(dest, filter="data")
-                logger.info(f"  Extracted {subject_dir}/{tar_file.stem}")
-            except Exception as e:
-                logger.warning(f"  Failed to extract {tar_file}: {e}")
-
-        c3d_dir = str(extract_dir)
-        logger.info(f"Extraction complete, ingesting from {c3d_dir}")
-
-    logger.info(f"Converting C3D files from {c3d_dir} → {output_dir} (workers={workers})")
-    results = batch_import(c3d_dir, output_dir, group_map=group_map, workers=workers)
-    logger.info(f"Converted {len(results)} subjects to .rrd")
+REPO_ID = "hudsonburke/rat-hindlimb-mocap"
 
 
-def push_rrd_to_hf(rrd_dir: str, repo_id: str, commit_message: str | None = None) -> None:
-    """Push .rrd files to a HuggingFace dataset.
-
-    Uploads all .rrd files in the directory to the repo's `rrd/` subdirectory.
-    """
+def push_rrd_to_hf(rrd_dir: str, repo_id: str = REPO_ID) -> None:
+    """Push .rrd files to a HuggingFace dataset."""
     try:
         from huggingface_hub import HfApi, login
     except ImportError:
@@ -128,15 +54,11 @@ def push_rrd_to_hf(rrd_dir: str, repo_id: str, commit_message: str | None = None
             repo_type="dataset",
         )
 
-    msg = commit_message or f"Update .rrd catalog ({len(rrd_files)} subjects)"
     logger.info(f"Push complete: {len(rrd_files)} files uploaded to {repo_id}")
 
 
-def pull_rrd_from_hf(output_dir: str, repo_id: str = "hudsonburke/rat-hindlimb-mocap") -> None:
-    """Download .rrd files from HuggingFace dataset.
-
-    Used by CI to get pre-built .rrd files without needing C3D conversion.
-    """
+def pull_rrd_from_hf(output_dir: str, repo_id: str = REPO_ID) -> None:
+    """Download .rrd files from HuggingFace dataset."""
     try:
         from huggingface_hub import HfApi, login, hf_hub_download
     except ImportError:
@@ -150,7 +72,6 @@ def pull_rrd_from_hf(output_dir: str, repo_id: str = "hudsonburke/rat-hindlimb-m
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # List .rrd files in the repo
     try:
         files = api.list_repo_files(repo_id, repo_type="dataset")
         rrd_files = [f for f in files if f.startswith("rrd/") and f.endswith(".rrd")]
@@ -185,46 +106,30 @@ def pull_rrd_from_hf(output_dir: str, repo_id: str = "hudsonburke/rat-hindlimb-m
 
 def main():
     parser = argparse.ArgumentParser(
-        description="C3D → .rrd ingestion pipeline",
+        description="Move .rrd files to/from HuggingFace",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Examples:\n"
-            "  # Convert C3D to .rrd on workstation\n"
-            "  python scripts/ingest.py convert --c3d-dir sourcedata/ -o data/rrd/\n"
-            "\n"
-            "  # Push .rrd files to HuggingFace\n"
-            "  python scripts/ingest.py push --rrd-dir data/rrd/\n"
-            "\n"
-            "  # Download .rrd files from HuggingFace (CI or fresh clone)\n"
+            "Conversion (C3D → .rrd) lives in the HF dataset repo:\n"
+            "  python scripts/convert.py --c3d-dir sourcedata/ -o rrd/ -j 8\n"
+            "\nExamples:\n"
             "  python scripts/ingest.py pull -o data/rrd/\n"
+            "  python scripts/ingest.py push --rrd-dir data/rrd/\n"
         ),
     )
-    subparsers = parser.add_subparsers(dest="command")
+    sub = parser.add_subparsers(dest="command")
 
-    # convert
-    convert_parser = subparsers.add_parser("convert", help="Convert C3D to .rrd (workstation only)")
-    convert_parser.add_argument("--c3d-dir", required=True, help="C3D source directory")
-    convert_parser.add_argument("-o", "--output", default="data/rrd", help="Output .rrd directory")
-    convert_parser.add_argument("--group-map", default=None, help="JSON group map file")
-    convert_parser.add_argument("-j", "--workers", type=int, default=1, help="Number of parallel workers (default: 1)")
+    push_p = sub.add_parser("push", help="Push .rrd files to HuggingFace")
+    push_p.add_argument("--rrd-dir", default="data/rrd")
+    push_p.add_argument("--repo", default=REPO_ID)
 
-    # push
-    push_parser = subparsers.add_parser("push", help="Push .rrd files to HuggingFace")
-    push_parser.add_argument("--rrd-dir", default="data/rrd", help=".rrd directory to upload")
-    push_parser.add_argument("--repo", default="hudsonburke/rat-hindlimb-mocap", help="HF repo ID")
-    push_parser.add_argument("--message", default=None, help="Commit message")
-
-    # pull
-    pull_parser = subparsers.add_parser("pull", help="Download .rrd files from HuggingFace")
-    pull_parser.add_argument("-o", "--output", default="data/rrd", help="Output directory")
-    pull_parser.add_argument("--repo", default="hudsonburke/rat-hindlimb-mocap", help="HF repo ID")
+    pull_p = sub.add_parser("pull", help="Download .rrd files from HuggingFace")
+    pull_p.add_argument("-o", "--output", default="data/rrd")
+    pull_p.add_argument("--repo", default=REPO_ID)
 
     args = parser.parse_args()
 
-    if args.command == "convert":
-        convert_c3d_to_rrd(args.c3d_dir, args.output, args.group_map, args.workers)
-    elif args.command == "push":
-        push_rrd_to_hf(args.rrd_dir, args.repo, args.message)
+    if args.command == "push":
+        push_rrd_to_hf(args.rrd_dir, args.repo)
     elif args.command == "pull":
         pull_rrd_from_hf(args.output, args.repo)
     else:
