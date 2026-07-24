@@ -13,3 +13,9 @@ data/figures/
 
 # Environment
 .venv/
+.direnv/
+
+# Build artifacts
+*.egg-info/
+__pycache__/
+flake.lock
