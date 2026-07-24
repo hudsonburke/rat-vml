@@ -30,10 +30,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None = None) -> None:
+def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None = None, workers: int = 1) -> None:
     """Convert C3D files to .rrd using rerun-importer-c3d batch mode.
 
     This runs on the workstation and requires ezc3d + rerun-importer-c3d.
+    Use --workers N to process N subjects in parallel.
     """
     try:
         from rerun_importer_c3d.batch import batch_import, load_group_map
@@ -54,8 +55,8 @@ def convert_c3d_to_rrd(c3d_dir: str, output_dir: str, group_map_path: str | None
         group_map = SUBJECT_TO_GROUP
         logger.info(f"Auto-generated group map with {len(group_map)} subjects")
 
-    logger.info(f"Converting C3D files from {c3d_dir} → {output_dir}")
-    results = batch_import(c3d_dir, output_dir, group_map=group_map)
+    logger.info(f"Converting C3D files from {c3d_dir} → {output_dir} (workers={workers})")
+    results = batch_import(c3d_dir, output_dir, group_map=group_map, workers=workers)
     logger.info(f"Converted {len(results)} subjects to .rrd")
 
 
@@ -171,6 +172,7 @@ def main():
     convert_parser.add_argument("--c3d-dir", required=True, help="C3D source directory")
     convert_parser.add_argument("-o", "--output", default="data/rrd", help="Output .rrd directory")
     convert_parser.add_argument("--group-map", default=None, help="JSON group map file")
+    convert_parser.add_argument("-j", "--workers", type=int, default=1, help="Number of parallel workers (default: 1)")
 
     # push
     push_parser = subparsers.add_parser("push", help="Push .rrd files to HuggingFace")
@@ -186,7 +188,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "convert":
-        convert_c3d_to_rrd(args.c3d_dir, args.output, args.group_map)
+        convert_c3d_to_rrd(args.c3d_dir, args.output, args.group_map, args.workers)
     elif args.command == "push":
         push_rrd_to_hf(args.rrd_dir, args.repo, args.message)
     elif args.command == "pull":
