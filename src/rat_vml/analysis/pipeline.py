@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Try imports that depend on OpenSim — they fail gracefully if not installed
 try:
     from osimpy.tools import IKSettings, IDSettings
+    from osimpy.moco.inverse import MocoInverseSettings
     from osimpy import sto_to_df
     _HAS_OPENSIM = True
 except ImportError:
@@ -298,6 +299,60 @@ def run_id(
     logger.info(f"ID complete: {result.moments_file}")
     return result.moments_file
 
+
+
+
+def run_moco(
+    model_path: Path,
+    coordinates_path: Path,
+    external_loads_path: Path,
+    output_dir: Path,
+    name: str = "moco_inverse",
+    initial_time: float | None = None,
+    final_time: float | None = None,
+    replace_muscles_with_dgf: bool = True,
+    mesh_interval: float = 0.02,
+) -> Path:
+    """Run MocoInverse muscle analysis using osimpy.
+
+    Parameters
+    ----------
+    model_path : Path
+        Path to the scaled .osim model.
+    coordinates_path : Path
+        Path to the IK .sto file (coordinate trajectories).
+    external_loads_path : Path
+        Path to the external loads .xml file.
+    output_dir : Path
+        Directory to write results.
+    name : str
+        Name prefix for output files.
+    initial_time, final_time : float, optional
+        Time window for the inverse problem.
+    replace_muscles_with_dgf : bool
+        Replace Millard muscles with DeGroote-Fregly muscle model.
+    mesh_interval : float
+        Mesh interval for the direct collocation solver.
+    """
+    if not _HAS_OPENSIM:
+        raise ImportError("osimpy is required for MocoInverse")
+
+    settings = MocoInverseSettings(
+        name=name,
+        model_path=model_path,
+        coordinates_path=coordinates_path,
+        external_loads_path=external_loads_path,
+        results_directory=output_dir,
+        initial_time=initial_time,
+        final_time=final_time,
+        replace_muscles_with_dgf=replace_muscles_with_dgf,
+        mesh_interval=mesh_interval,
+    )
+    result = settings.run()
+    if not result.success:
+        raise RuntimeError(f"MocoInverse failed: {result.errors}")
+    logger.info(f"MocoInverse complete: {result.solution_file}")
+    return Path(result.solution_file)
 
 # =========================================================================
 # Spline to stance+swing
