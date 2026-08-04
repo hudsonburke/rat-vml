@@ -73,8 +73,10 @@ class TrialResult:
     trial_name: str
     ik_file: Path | None = None
     id_file: Path | None = None
+    moco_file: Path | None = None
     ik_splined: np.ndarray | None = None  # (202, n_coords) stance+swing
     id_splined: np.ndarray | None = None  # (202, n_moments) stance+swing
+    moco_splined: np.ndarray | None = None  # (202, n_muscles) stance+swing
     events: GaitEvents | None = None
     side: str = "right"
     success: bool = False
@@ -423,6 +425,7 @@ def run_subject(
     skip_scaling: bool = False,
     skip_ik: bool = False,
     skip_id: bool = False,
+    skip_moco: bool = False,
     min_events: int = 7,
 ) -> SubjectResult:
     """Run the full pipeline for one subject session.
@@ -535,6 +538,21 @@ def run_subject(
                 else:
                     id_file = trial_out / f"{subject_id}_{trial_name}_id.sto"
                 trial_result.id_file = id_file
+
+                # Run MocoInverse (muscle analysis)
+                if not skip_moco:
+                    try:
+                        moco_file = run_moco(
+                            model_path=model_path,
+                            coordinates_path=ik_file,
+                            external_loads_path=ext_loads_path,
+                            output_dir=trial_out,
+                            name=f"{subject_id}_{trial_name}_moco",
+                        )
+                        trial_result.moco_file = moco_file
+                    except Exception as e:
+                        logger.warning(f"  MocoInverse failed for {trial_name}: {e}")
+                        trial_result.errors.append(f"MocoInverse: {e}")
 
                 # Load and spline results
                 if ik_file.exists():
