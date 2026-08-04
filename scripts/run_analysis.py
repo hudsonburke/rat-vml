@@ -296,6 +296,7 @@ def main():
     parser.add_argument("--session", default="Baseline", help="Session to analyze (e.g. Baseline, Week24)")
     parser.add_argument("--skip-ik", action="store_true", help="Skip IK (use cached)")
     parser.add_argument("--skip-id", action="store_true", help="Skip ID (use cached)")
+    parser.add_argument("--skip-moco", action="store_true", help="Skip MocoInverse muscle analysis")
     args = parser.parse_args()
 
     data_dir = args.data_dir or PROJECT_ROOT / "data"
@@ -379,6 +380,7 @@ def main():
                 skip_scaling=args.skip_ik,
                 skip_ik=args.skip_ik,
                 skip_id=args.skip_id,
+                skip_moco=args.skip_moco,
             )
 
             if result.success:
