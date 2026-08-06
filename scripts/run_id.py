@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Run ID for a subject/trial.
+"""Run ID for a subject/trial using osimpy directly.
+
+Reads force plates from Parquet, writes MOT + ext loads using osimpy io, runs ID using osimpy IDSettings.
 
 Usage::
 
-    python scripts/run_id.py --subject BAA01 --trial Walk02 --model data/results/BAA01/scaled/model.osim --ik-file data/results/BAA01/trials/Walk02/BAA01_Walk02_ik.mot
+    python scripts/run_id.py --data-dir data/processed --subject BAA01 --session Baseline --trial Walk02 --model data/processed/BAA01/scaled_model.osim --ik-file data/processed/BAA01/ik_Baseline_Walk02.mot
 """
 
 import argparse
@@ -22,24 +24,34 @@ def main():
     parser.add_argument("--trial", required=True, help="Trial name")
     parser.add_argument("--model", required=True, help="Scaled model path")
     parser.add_argument("--ik-file", required=True, help="IK result file")
-    parser.add_argument("--output-dir", "-o", default="data/results", help="Output directory")
+    parser.add_argument("--output-dir", "-o", default="data/processed", help="Output directory")
+    # ID-specific params (from params.yaml via DVC)
+    parser.add_argument("--lowpass-cutoff-frequency", type=float, default=6.0)
     args = parser.parse_args()
 
+    from osimpy.tools import IDSettings
     from rat_vml.analysis.parquet_io import parquet_to_fp_mot
-    from rat_vml.analysis.pipeline import run_id
 
-    output_dir = Path(args.output_dir) / args.subject / "trials" / args.trial
+    output_dir = Path(args.output_dir) / args.subject
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract force plate data from Parquet
     _, ext_loads_path = parquet_to_fp_mot(
-        args.data_dir, args.subject, args.session, args.trial, output_dir
+        args.data_dir, args.subject, args.session, args.trial, output_dir,
+        output_prefix=f"{args.session}_{args.trial}"
     )
 
-    # Run ID
-    id_file = run_id(Path(args.model), Path(args.ik_file), ext_loads_path, output_dir,
-                     name=f"{args.subject}_{args.trial}")
-    logger.info(f"ID complete: {id_file}")
+    # Run ID using osimpy
+    id_path = output_dir / f"id_{args.session}_{args.trial}.sto"
+    settings = IDSettings(
+        model_path=Path(args.model),
+        coordinates_path=Path(args.ik_file),
+        output_forces_file=str(id_path),
+        external_loads_path=ext_loads_path,
+        lowpass_cutoff_frequency=args.lowpass_cutoff_frequency,
+    )
+    result = settings.run()
+    logger.info(f"ID complete: {id_path}")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,9 @@
 # DVC pipeline for rat-vml analysis
-# Each stage uses a focused script with clear inputs/outputs
+# Each stage calls osimpy tools directly via focused scripts
+# Data flow: Parquet → TRC/MOT → osimpy → results → Parquet
 
 stages:
-  # Scale model per subject (side-specific lengths)
+  # Scale model per subject
   scale:
     foreach: ${subjects}
     do:
@@ -12,13 +13,12 @@ stages:
         --subject ${item.id}
         --session ${item.session}
         --model ${item.model}
-        --output-dir data/results
+        --output-dir data/processed
       deps:
         - scripts/scale.py
-        - src/rat_vml/analysis/pipeline.py
         - data/processed/${item.id}/markers.parquet
       outs:
-        - data/results/${item.id}/scaled/
+        - data/processed/${item.id}/scaled_model.osim
       params:
         - subjects.${item.id}.mass
         - subjects.${item.id}.femur_length_l
@@ -26,7 +26,7 @@ stages:
         - subjects.${item.id}.tibia_length_l
         - subjects.${item.id}.tibia_length_r
 
-  # IK per trial
+  # IK per trial — calls osimpy IKSettings directly
   ik:
     foreach: ${trials}
     do:
@@ -36,22 +36,20 @@ stages:
         --subject ${item.subject}
         --session ${item.session}
         --trial ${item.trial}
-        --model data/results/${item.subject}/scaled/model.osim
-        --output-dir data/results
+        --model data/processed/${item.subject}/scaled_model.osim
+        --output-dir data/processed
       deps:
         - scripts/run_ik.py
-        - src/rat_vml/analysis/pipeline.py
-        - src/rat_vml/analysis/parquet_io.py
-        - data/results/${item.subject}/scaled/model.osim
+        - data/processed/${item.subject}/scaled_model.osim
         - data/processed/${item.subject}/markers.parquet
       outs:
-        - data/results/${item.subject}/trials/${item.trial}/${item.trial}.trc
-        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
+        - data/processed/${item.subject}/ik_${item.session}_${item.trial}.mot
       params:
         - ik.marker_weight
-        - ik.max_iterations
+        - ik.accuracy
+        - ik.constraint_weight
 
-  # ID per trial
+  # ID per trial — calls osimpy IDSettings directly
   id:
     foreach: ${trials}
     do:
@@ -61,43 +59,39 @@ stages:
         --subject ${item.subject}
         --session ${item.session}
         --trial ${item.trial}
-        --model data/results/${item.subject}/scaled/model.osim
-        --ik-file data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
-        --output-dir data/results
+        --model data/processed/${item.subject}/scaled_model.osim
+        --ik-file data/processed/${item.subject}/ik_${item.session}_${item.trial}.mot
+        --output-dir data/processed
       deps:
         - scripts/run_id.py
-        - src/rat_vml/analysis/pipeline.py
-        - src/rat_vml/analysis/parquet_io.py
-        - data/results/${item.subject}/scaled/model.osim
-        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
+        - data/processed/${item.subject}/scaled_model.osim
+        - data/processed/${item.subject}/ik_${item.session}_${item.trial}.mot
         - data/processed/${item.subject}/forceplates.parquet
       outs:
-        - data/results/${item.subject}/trials/${item.trial}/${item.trial}_forces.mot
-        - data/results/${item.subject}/trials/${item.trial}/${item.trial}_ext_loads.xml
-        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_id.sto
+        - data/processed/${item.subject}/id_${item.session}_${item.trial}.sto
       params:
-        - id.cutoff_freq
+        - id.lowpass_cutoff_frequency
 
-  # MocoInverse per trial
+  # MocoInverse per trial — calls osimpy MocoInverseSettings directly
   moco:
     foreach: ${trials}
     do:
       cmd: >-
         python scripts/run_moco.py
         --subject ${item.subject}
+        --session ${item.session}
         --trial ${item.trial}
-        --model data/results/${item.subject}/scaled/model.osim
-        --ik-file data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
-        --ext-loads data/results/${item.subject}/trials/${item.trial}/${item.trial}_ext_loads.xml
-        --output-dir data/results
+        --model data/processed/${item.subject}/scaled_model.osim
+        --ik-file data/processed/${item.subject}/ik_${item.session}_${item.trial}.mot
+        --ext-loads data/processed/${item.subject}/ext_loads_${item.session}_${item.trial}.xml
+        --output-dir data/processed
       deps:
         - scripts/run_moco.py
-        - src/rat_vml/analysis/pipeline.py
-        - data/results/${item.subject}/scaled/model.osim
-        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
-        - data/results/${item.subject}/trials/${item.trial}/${item.trial}_ext_loads.xml
+        - data/processed/${item.subject}/scaled_model.osim
+        - data/processed/${item.subject}/ik_${item.session}_${item.trial}.mot
+        - data/processed/${item.subject}/ext_loads_${item.session}_${item.trial}.xml
       outs:
-        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_moco.sto
+        - data/processed/${item.subject}/moco_${item.session}_${item.trial}.sto
       params:
         - moco.mesh_interval
         - moco.replace_muscles_with_dgf
@@ -105,11 +99,10 @@ stages:
 
   # Aggregate group results
   aggregate:
-    cmd: python scripts/aggregate.py --results-dir data/results --output-dir data/aggregate
+    cmd: python scripts/aggregate.py --data-dir data/processed --output-dir data/aggregate
     deps:
       - scripts/aggregate.py
-      - src/rat_vml/analysis/pipeline.py
-      - data/results/
+      - data/processed/
     outs:
       - data/aggregate/
 
@@ -118,7 +111,6 @@ stages:
     cmd: python scripts/plot.py --aggregate-dir data/aggregate --output-dir data/figures
     deps:
       - scripts/plot.py
-      - src/rat_vml/analysis/plots.py
       - data/aggregate/
     outs:
       - data/figures/
