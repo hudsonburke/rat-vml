@@ -300,7 +300,6 @@ def main():
     args = parser.parse_args()
 
     data_dir = args.data_dir or PROJECT_ROOT / "data"
-    rrd_dir = data_dir / "rrd"
     figures_dir = data_dir / "figures"
     scaled_dir = data_dir / "scaled_models"
     results_dir = data_dir / "results"
@@ -358,10 +357,10 @@ def main():
         if args.group and group != args.group:
             continue
 
-        # Find the .rrd file for this subject
-        rrd_path = rrd_dir / f"{subject_id}.rrd"
-        if not rrd_path.exists():
-            logger.warning(f"No .rrd file found for {subject_id}")
+        # Check that Parquet data exists for this subject
+        markers_path = data_dir / subject_id / "markers.parquet"
+        if not markers_path.exists():
+            logger.warning(f"No Parquet data found for {subject_id}")
             continue
 
         subject_out = results_dir / subject_id
@@ -375,7 +374,7 @@ def main():
                 subject_id=subject_id,
                 session=session,
                 group=group,
-                rrd_path=rrd_path,
+                data_dir=data_dir,
                 output_dir=subject_out,
                 skip_scaling=args.skip_ik,
                 skip_ik=args.skip_ik,
