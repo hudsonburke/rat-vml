@@ -85,7 +85,7 @@ def load_results(
     session: str | None = None,
     subject_ids: list[str] | None = None,
 ) -> pl.DataFrame:
-    """Load results from Parquet files.
+    """Load results from Parquet files using glob.
 
     Parameters
     ----------
@@ -104,19 +104,21 @@ def load_results(
         Long-format DataFrame with columns:
         time, coord, value, subject_id, session_id, trial_name
     """
+    import glob as globmod
+
     data_dir = Path(data_dir)
-    filename = f"{result_type}_results.parquet"
+    pattern = str(data_dir / "*" / f"{result_type}_results.parquet")
+    paths = sorted(globmod.glob(pattern))
+
+    if not paths:
+        return pl.DataFrame()
 
     dfs = []
-    for subject_dir in sorted(data_dir.iterdir()):
-        if not subject_dir.is_dir():
-            continue
+    for path in paths:
+        p = Path(path)
+        subject_id = p.parent.name
 
-        if subject_ids and subject_dir.name not in subject_ids:
-            continue
-
-        path = subject_dir / filename
-        if not path.exists():
+        if subject_ids and subject_id not in subject_ids:
             continue
 
         df = pl.read_parquet(path)
