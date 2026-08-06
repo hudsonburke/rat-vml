@@ -1,94 +1,113 @@
+# DVC pipeline for rat-vml analysis
+# Each stage uses a focused script with clear inputs/outputs
+
 stages:
-  # Scale model per subject
+  # Scale model per subject (side-specific lengths)
   scale:
     foreach: ${subjects}
     do:
       cmd: >-
-        python scripts/run_analysis.py
+        python scripts/scale.py
         --data-dir data/processed
-        --model ${item.model}
         --subject ${item.id}
         --session ${item.session}
-        --skip-ik --skip-id --skip-moco
+        --model ${item.model}
+        --output-dir data/results
       deps:
-        - scripts/run_analysis.py
+        - scripts/scale.py
         - src/rat_vml/analysis/pipeline.py
         - data/processed/${item.id}/markers.parquet
       outs:
         - data/results/${item.id}/scaled/
       params:
         - subjects.${item.id}.mass
-        - subjects.${item.id}.femur_length
-        - subjects.${item.id}.tibia_length
+        - subjects.${item.id}.femur_length_l
+        - subjects.${item.id}.femur_length_r
+        - subjects.${item.id}.tibia_length_l
+        - subjects.${item.id}.tibia_length_r
 
-  # IK per subject
+  # IK per trial
   ik:
-    foreach: ${subjects}
+    foreach: ${trials}
     do:
       cmd: >-
-        python scripts/run_analysis.py
+        python scripts/run_ik.py
         --data-dir data/processed
-        --model ${item.model}
-        --subject ${item.id}
+        --subject ${item.subject}
         --session ${item.session}
-        --skip-id --skip-moco
+        --trial ${item.trial}
+        --model data/results/${item.subject}/scaled/model.osim
+        --output-dir data/results
       deps:
-        - scripts/run_analysis.py
+        - scripts/run_ik.py
         - src/rat_vml/analysis/pipeline.py
-        - data/results/${item.id}/scaled/
-        - data/processed/${item.id}/markers.parquet
+        - src/rat_vml/analysis/parquet_io.py
+        - data/results/${item.subject}/scaled/model.osim
+        - data/processed/${item.subject}/markers.parquet
       outs:
-        - data/results/${item.id}/results/ik_results.parquet
+        - data/results/${item.subject}/trials/${item.trial}/${item.trial}.trc
+        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
       params:
         - ik.marker_weight
+        - ik.max_iterations
 
-  # ID per subject
+  # ID per trial
   id:
-    foreach: ${subjects}
+    foreach: ${trials}
     do:
       cmd: >-
-        python scripts/run_analysis.py
+        python scripts/run_id.py
         --data-dir data/processed
-        --model ${item.model}
-        --subject ${item.id}
+        --subject ${item.subject}
         --session ${item.session}
-        --skip-moco
+        --trial ${item.trial}
+        --model data/results/${item.subject}/scaled/model.osim
+        --ik-file data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
+        --output-dir data/results
       deps:
-        - scripts/run_analysis.py
+        - scripts/run_id.py
         - src/rat_vml/analysis/pipeline.py
-        - data/results/${item.id}/results/ik_results.parquet
-        - data/processed/${item.id}/forceplates.parquet
+        - src/rat_vml/analysis/parquet_io.py
+        - data/results/${item.subject}/scaled/model.osim
+        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
+        - data/processed/${item.subject}/forceplates.parquet
       outs:
-        - data/results/${item.id}/results/id_results.parquet
+        - data/results/${item.subject}/trials/${item.trial}/${item.trial}_forces.mot
+        - data/results/${item.subject}/trials/${item.trial}/${item.trial}_ext_loads.xml
+        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_id.sto
       params:
         - id.cutoff_freq
 
-  # MocoInverse per subject
+  # MocoInverse per trial
   moco:
-    foreach: ${subjects}
+    foreach: ${trials}
     do:
       cmd: >-
-        python scripts/run_analysis.py
-        --data-dir data/processed
-        --model ${item.model}
-        --subject ${item.id}
-        --session ${item.session}
+        python scripts/run_moco.py
+        --subject ${item.subject}
+        --trial ${item.trial}
+        --model data/results/${item.subject}/scaled/model.osim
+        --ik-file data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
+        --ext-loads data/results/${item.subject}/trials/${item.trial}/${item.trial}_ext_loads.xml
+        --output-dir data/results
       deps:
-        - scripts/run_analysis.py
+        - scripts/run_moco.py
         - src/rat_vml/analysis/pipeline.py
-        - data/results/${item.id}/results/ik_results.parquet
-        - data/results/${item.id}/results/id_results.parquet
+        - data/results/${item.subject}/scaled/model.osim
+        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_ik.mot
+        - data/results/${item.subject}/trials/${item.trial}/${item.trial}_ext_loads.xml
       outs:
-        - data/results/${item.id}/results/moco_results.parquet
+        - data/results/${item.subject}/trials/${item.trial}/${item.subject}_${item.trial}_moco.sto
       params:
         - moco.mesh_interval
         - moco.replace_muscles_with_dgf
+        - moco.reserve_optimal_force
 
   # Aggregate group results
   aggregate:
-    cmd: python scripts/run_analysis.py --aggregate-only
+    cmd: python scripts/aggregate.py --results-dir data/results --output-dir data/aggregate
     deps:
-      - scripts/run_analysis.py
+      - scripts/aggregate.py
       - src/rat_vml/analysis/pipeline.py
       - data/results/
     outs:
@@ -96,9 +115,9 @@ stages:
 
   # Plot figures
   plot:
-    cmd: python scripts/run_analysis.py --plot-only
+    cmd: python scripts/plot.py --aggregate-dir data/aggregate --output-dir data/figures
     deps:
-      - scripts/run_analysis.py
+      - scripts/plot.py
       - src/rat_vml/analysis/plots.py
       - data/aggregate/
     outs:

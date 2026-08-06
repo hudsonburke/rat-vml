@@ -527,7 +527,7 @@ def run_subject(
 
                 # Store IK result in Parquet
                 if ik_file.exists():
-                    store_ik_result(ik_file, subject_id, session, trial_name, output_dir / "results")
+                    store_ik_result(ik_file, subject_id, session, trial_name, data_dir / subject_id)
 
                 # Run ID
                 if not skip_id:
@@ -541,7 +541,7 @@ def run_subject(
 
                 # Store ID result in Parquet
                 if id_file.exists():
-                    store_id_result(id_file, subject_id, session, trial_name, output_dir / "results")
+                    store_id_result(id_file, subject_id, session, trial_name, data_dir / subject_id)
 
                 # Run MocoInverse (muscle analysis)
                 if not skip_moco:
@@ -557,7 +557,7 @@ def run_subject(
 
                         # Store Moco result in Parquet
                         if moco_file.exists():
-                            store_moco_result(moco_file, subject_id, session, trial_name, output_dir / "results")
+                            store_moco_result(moco_file, subject_id, session, trial_name, data_dir / subject_id)
                     except Exception as e:
                         logger.warning(f"  MocoInverse failed for {trial_name}: {e}")
                         trial_result.errors.append(f"MocoInverse: {e}")
