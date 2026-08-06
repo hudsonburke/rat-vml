@@ -50,6 +50,7 @@ from .events import (
 )
 from .forces import process_force_plate, zero_outside_gait_cycle, write_external_loads_xml
 from .parquet_io import parquet_to_trc, parquet_to_fp_mot
+from .results_storage import store_ik_result, store_id_result, store_moco_result
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +525,10 @@ def run_subject(
                     ik_file = trial_out / f"{subject_id}_{trial_name}_ik.mot"
                 trial_result.ik_file = ik_file
 
+                # Store IK result in Parquet
+                if ik_file.exists():
+                    store_ik_result(ik_file, subject_id, session, trial_name, output_dir / "results")
+
                 # Run ID
                 if not skip_id:
                     id_file = run_id(
@@ -533,6 +538,10 @@ def run_subject(
                 else:
                     id_file = trial_out / f"{subject_id}_{trial_name}_id.sto"
                 trial_result.id_file = id_file
+
+                # Store ID result in Parquet
+                if id_file.exists():
+                    store_id_result(id_file, subject_id, session, trial_name, output_dir / "results")
 
                 # Run MocoInverse (muscle analysis)
                 if not skip_moco:
@@ -545,6 +554,10 @@ def run_subject(
                             name=f"{subject_id}_{trial_name}_moco",
                         )
                         trial_result.moco_file = moco_file
+
+                        # Store Moco result in Parquet
+                        if moco_file.exists():
+                            store_moco_result(moco_file, subject_id, session, trial_name, output_dir / "results")
                     except Exception as e:
                         logger.warning(f"  MocoInverse failed for {trial_name}: {e}")
                         trial_result.errors.append(f"MocoInverse: {e}")
