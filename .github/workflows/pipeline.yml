@@ -14,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       session:
-        description: 'Session to analyze (e.g. Baseline, Week24)'
+        description: 'Session to analyze (e.g. baseline, week24)'
         required: false
-        default: 'Week24'
+        default: 'week24'
       model_ref:
         description: 'Git ref for rat-hindlimb-model (branch or tag)'
         required: false
@@ -31,7 +31,7 @@ env:
 
 jobs:
   # ----------------------------------------------------------------
-  # Job 1: Install deps + validate project structure
+  # Job 1: Validate project structure and imports
   # ----------------------------------------------------------------
   validate:
     runs-on: ubuntu-latest
@@ -48,30 +48,29 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Validate project structure
+      - name: Validate subject groups
         run: |
           uv run python -c "
           from rat_vml.analysis.subject_groups import SUBJECT_TO_GROUP
           print(f'Subject groups loaded: {len(SUBJECT_TO_GROUP)} subjects')
           assert len(SUBJECT_TO_GROUP) > 50, f'Expected 50+ subjects, got {len(SUBJECT_TO_GROUP)}'
-          print('✓ Subject groups validated')
+          print('Subject groups validated')
           "
 
-      - name: Validate analysis module imports
+      - name: Validate analysis imports
         run: |
           uv run python -c "
-          from rat_vml.analysis.events import GaitEvents, validate_walking_trial
-          from rat_vml.analysis.io import rrd_to_trc, rrd_to_fp_mot
-          from rat_vml.analysis.pipeline import run_subject, aggregate_group
-          from rat_vml.analysis.plots import plot_kinematics, plot_kinetics
-          from rat_vml.analysis.queries import RerunCatalog
-          print('✓ All analysis module imports validated')
+          from rat_vml.analysis.parquet_catalog import ParquetCatalog
+          from rat_vml.analysis.parquet_io import parquet_to_trc, parquet_to_fp_mot
+          from rat_vml.analysis.results_storage import store_ik_result, store_id_result, store_moco_result
+          from rat_vml.analysis.aggregation import load_results, aggregate_by_group, compare_groups
+          print('All analysis module imports validated')
           "
 
   # ----------------------------------------------------------------
-  # Job 2: Download .rrd catalog + build subjects.csv
+  # Job 2: Download Parquet data from HF + validate
   # ----------------------------------------------------------------
-  catalog:
+  data:
     needs: validate
     runs-on: ubuntu-latest
     steps:
@@ -87,53 +86,72 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Cache .rrd catalog
+      - name: Cache Parquet data
         uses: actions/cache@v4
-        id: cache-rrd
+        id: cache-parquet
         with:
-          path: data/rrd
-          key: rrd-catalog-${{ hashFiles('scripts/ingest.py') }}
-          restore-keys: rrd-catalog-
+          path: data/processed
+          key: parquet-data-${{ hashFiles('.github/workflows/pipeline.yml') }}
+          restore-keys: parquet-data-
 
-      - name: Download .rrd files from HuggingFace
-        if: steps.cache-rrd.outputs.cache-hit != 'true'
+      - name: Download Parquet from HuggingFace
+        if: steps.cache-parquet.outputs.cache-hit != 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          uv run python scripts/ingest.py pull \
-            --repo hudsonburke/rat-hindlimb-mocap \
-            -o data/rrd/
-          echo "=== .rrd files ==="
-          ls -lh data/rrd/*.rrd 2>/dev/null | head -10 || echo "No .rrd files"
+          uv run python -c "
+          from huggingface_hub import snapshot_download
+          import os
 
-      - name: Build subjects.csv from catalog
+          token = os.environ.get('HF_TOKEN')
+          if not token:
+              print('WARNING: HF_TOKEN not set, skipping download')
+              exit(0)
+
+          path = snapshot_download(
+              'hudsonburke/rat-hindlimb-mocap',
+              repo_type='dataset',
+              token=token,
+              local_dir='data/processed',
+              allow_patterns=['processed/**/*.parquet'],
+          )
+          print(f'Downloaded to {path}')
+          "
+
+      - name: Validate Parquet data
         run: |
-          uv run python scripts/catalog.py subjects \
-            data/rrd/ \
-            -o data/subjects.csv 2>&1 | tee subjects.log
-          echo "=== subjects.csv ==="
-          head -5 data/subjects.csv 2>/dev/null || echo "No subjects.csv"
+          uv run python -c "
+          from pathlib import Path
+          import polars as pl
 
-      - name: Query catalog for valid trials
-        run: |
-          uv run python scripts/catalog.py query data/rrd/ --side right 2>&1 || \
-            echo "Query skipped (DuckDB rrd extension not available in CI)"
+          data_dir = Path('data/processed')
+          if not data_dir.exists():
+              print('WARNING: No data directory, skipping validation')
+              exit(0)
 
-      - name: Upload catalog and subjects
+          subjects = [d for d in data_dir.iterdir() if d.is_dir()]
+          print(f'Found {len(subjects)} subject directories')
+
+          for subject_dir in sorted(subjects)[:3]:
+              markers = subject_dir / 'markers.parquet'
+              if markers.exists():
+                  df = pl.read_parquet(markers)
+                  print(f'  {subject_dir.name}: {df.shape[0]} marker rows, {df[\"session_id\"].unique().to_list()[:3]} sessions')
+          "
+
+      - name: Upload Parquet data
         uses: actions/upload-artifact@v4
         with:
-          name: catalog-data
-          path: |
-            data/rrd/
-            data/subjects.csv
+          name: parquet-data
+          path: data/processed/
           if-no-files-found: ignore
           retention-days: 7
 
   # ----------------------------------------------------------------
-  # Job 3: Run analysis pipeline (manual dispatch only)
+  # Job 3: Run pipeline (manual dispatch)
   # ----------------------------------------------------------------
   analysis:
-    needs: catalog
+    needs: data
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     steps:
@@ -159,32 +177,30 @@ jobs:
             /tmp/model
           ls /tmp/model/models/osim/rat_hindlimb_bilateral.osim
 
-      - name: Download catalog data from previous job
+      - name: Download Parquet data
         uses: actions/download-artifact@v4
         with:
-          name: catalog-data
-          path: data/
+          name: parquet-data
+          path: data/processed/
 
-      - name: Run analysis pipeline
+      - name: Run IK pipeline
         run: |
-          uv run python scripts/run_analysis.py \
-            --data-dir data \
+          SESSION=${{ github.event.inputs.session || 'baseline' }}
+          uv run python scripts/run_ik.py \
+            --data-dir data/processed \
+            --subject BAA01 \
+            --session $SESSION \
+            --trial Walk01 \
             --model /tmp/model/models/osim/rat_hindlimb_bilateral.osim \
-            --session ${{ github.event.inputs.session || 'Baseline' }} \
-            2>&1 | tee analysis.log
+            2>&1 | tee ik.log
 
-      - name: Upload figures
+      - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: figures
-          path: data/figures/
-          if-no-files-found: ignore
-
-      - name: Upload analysis log
-        uses: actions/upload-artifact@v4
-        with:
-          name: analysis-log
-          path: analysis.log
+          name: pipeline-results
+          path: |
+            data/processed/
+            ik.log
           if-no-files-found: ignore
 
   # ----------------------------------------------------------------
