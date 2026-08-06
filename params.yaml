@@ -1,0 +1,24 @@
+# DVC pipeline parameters for rat-vml analysis
+
+# Subject definitions (populated from subjects.csv)
+subjects: {}
+
+# IK parameters
+ik:
+  marker_weight: 1.0
+  max_iterations: 200
+
+# ID parameters
+id:
+  cutoff_freq: 6.0
+
+# MocoInverse parameters
+moco:
+  mesh_interval: 0.02
+  replace_muscles_with_dgf: true
+  reserve_optimal_force: 1.0
+
+# Scaling parameters
+scaling:
+  # Hicks regression coefficients for muscle/tendon dimensions
+  muscle_scale_method: hicks

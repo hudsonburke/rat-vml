@@ -1,0 +1,105 @@
+stages:
+  # Scale model per subject
+  scale:
+    foreach: ${subjects}
+    do:
+      cmd: >-
+        python scripts/run_analysis.py
+        --data-dir data/processed
+        --model ${item.model}
+        --subject ${item.id}
+        --session ${item.session}
+        --skip-ik --skip-id --skip-moco
+      deps:
+        - scripts/run_analysis.py
+        - src/rat_vml/analysis/pipeline.py
+        - data/processed/${item.id}/markers.parquet
+      outs:
+        - data/results/${item.id}/scaled/
+      params:
+        - subjects.${item.id}.mass
+        - subjects.${item.id}.femur_length
+        - subjects.${item.id}.tibia_length
+
+  # IK per subject
+  ik:
+    foreach: ${subjects}
+    do:
+      cmd: >-
+        python scripts/run_analysis.py
+        --data-dir data/processed
+        --model ${item.model}
+        --subject ${item.id}
+        --session ${item.session}
+        --skip-id --skip-moco
+      deps:
+        - scripts/run_analysis.py
+        - src/rat_vml/analysis/pipeline.py
+        - data/results/${item.id}/scaled/
+        - data/processed/${item.id}/markers.parquet
+      outs:
+        - data/results/${item.id}/results/ik_results.parquet
+      params:
+        - ik.marker_weight
+
+  # ID per subject
+  id:
+    foreach: ${subjects}
+    do:
+      cmd: >-
+        python scripts/run_analysis.py
+        --data-dir data/processed
+        --model ${item.model}
+        --subject ${item.id}
+        --session ${item.session}
+        --skip-moco
+      deps:
+        - scripts/run_analysis.py
+        - src/rat_vml/analysis/pipeline.py
+        - data/results/${item.id}/results/ik_results.parquet
+        - data/processed/${item.id}/forceplates.parquet
+      outs:
+        - data/results/${item.id}/results/id_results.parquet
+      params:
+        - id.cutoff_freq
+
+  # MocoInverse per subject
+  moco:
+    foreach: ${subjects}
+    do:
+      cmd: >-
+        python scripts/run_analysis.py
+        --data-dir data/processed
+        --model ${item.model}
+        --subject ${item.id}
+        --session ${item.session}
+      deps:
+        - scripts/run_analysis.py
+        - src/rat_vml/analysis/pipeline.py
+        - data/results/${item.id}/results/ik_results.parquet
+        - data/results/${item.id}/results/id_results.parquet
+      outs:
+        - data/results/${item.id}/results/moco_results.parquet
+      params:
+        - moco.mesh_interval
+        - moco.replace_muscles_with_dgf
+
+  # Aggregate group results
+  aggregate:
+    cmd: python scripts/run_analysis.py --aggregate-only
+    deps:
+      - scripts/run_analysis.py
+      - src/rat_vml/analysis/pipeline.py
+      - data/results/
+    outs:
+      - data/aggregate/
+
+  # Plot figures
+  plot:
+    cmd: python scripts/run_analysis.py --plot-only
+    deps:
+      - scripts/run_analysis.py
+      - src/rat_vml/analysis/plots.py
+      - data/aggregate/
+    outs:
+      - data/figures/
