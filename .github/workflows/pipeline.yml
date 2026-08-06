@@ -96,22 +96,13 @@ jobs:
 
       - name: Download Parquet from HuggingFace
         if: steps.cache-parquet.outputs.cache-hit != 'true'
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           uv run python -c "
           from huggingface_hub import snapshot_download
-          import os
-
-          token = os.environ.get('HF_TOKEN')
-          if not token:
-              print('WARNING: HF_TOKEN not set, skipping download')
-              exit(0)
 
           path = snapshot_download(
               'hudsonburke/rat-hindlimb-mocap',
               repo_type='dataset',
-              token=token,
               local_dir='data/processed',
               allow_patterns=['processed/**/*.parquet'],
           )
