@@ -2,6 +2,11 @@
 
 Reads marker and force plate data from Parquet files (written by
 movedb-core) and writes TRC and MOT files for OpenSim IK/ID.
+
+Uses osimpy's io module for file writing:
+- osimpy.io.trc.df_to_trc + TRCMetadata
+- osimpy.io.sto.df_to_sto + STOMetadata
+- osimpy.io.forces.export_external_loads
 """
 
 import logging
@@ -12,6 +17,7 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
+# Vicon -> OpenSim coordinate rotation
 _VICON_TO_OPENSIM = np.array([
     [1, 0, 0],
     [0, 0, 1],
@@ -51,6 +57,70 @@ def _detect_rate(df: pl.DataFrame) -> float:
     return round(1.0 / dt, 1) if dt > 0 else 200.0
 
 
+def _markers_to_wide_df(markers_df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
+    """Pivot markers from long to wide format for TRC writing.
+
+    Returns (wide_df, marker_names) where wide_df has columns:
+    Frame, Time, {name}_x, {name}_y, {name}_z for each marker.
+    """
+    marker_names = sorted(markers_df["marker_name"].unique().to_list())
+    frames = markers_df.select(["time", "frame"]).unique().sort("frame")
+
+    data = {"Frame": frames["frame"].to_list(), "Time": frames["time"].to_list()}
+
+    for name in marker_names:
+        m = markers_df.filter(pl.col("marker_name") == name).sort("frame")
+        if len(m) < len(frames):
+            padded = frames.join(m, on="frame", how="left").fill_null(0)
+            x = padded["x"].to_numpy()
+            y = padded["y"].to_numpy()
+            z = padded["z"].to_numpy()
+        else:
+            x = m["x"].to_numpy()
+            y = m["y"].to_numpy()
+            z = m["z"].to_numpy()
+
+        # Apply Vicon -> OpenSim rotation
+        coords = np.column_stack([x, y, z]) @ _VICON_TO_OPENSIM.T
+        data[f"{name}_x"] = coords[:, 0]
+        data[f"{name}_y"] = coords[:, 1]
+        data[f"{name}_z"] = coords[:, 2]
+
+    return pl.DataFrame(data), marker_names
+
+
+def _fp_to_wide_df(fp_df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
+    """Pivot force plates from long to wide format for MOT writing.
+
+    Returns (wide_df, fp_names) where wide_df has columns:
+    time, {fp}_force_x, {fp}_force_y, ..., {fp}_cop_x, ..., {fp}_moment_x, ...
+    """
+    fp_names = sorted(fp_df["fp_name"].unique().to_list())
+    frames = fp_df.select(["time", "frame"]).unique().sort("frame")
+
+    data = {"time": frames["time"].to_list()}
+
+    for fp in fp_names:
+        for var in ["force", "moment", "cop"]:
+            for axis in ["x", "y", "z"]:
+                col_name = f"{fp}_{var}_{axis}"
+                vals = []
+                for frame in frames["frame"].to_list():
+                    v = fp_df.filter(
+                        (pl.col("fp_name") == fp)
+                        & (pl.col("variable") == var)
+                        & (pl.col("axis") == axis)
+                        & (pl.col("frame") == frame)
+                    )
+                    if v.is_empty():
+                        vals.append(0.0)
+                    else:
+                        vals.append(float(v["value"].to_list()[0]))
+                data[col_name] = vals
+
+    return pl.DataFrame(data), fp_names
+
+
 def parquet_to_trc(
     data_dir: str | Path,
     subject_id: str,
@@ -59,7 +129,9 @@ def parquet_to_trc(
     output_dir: str | Path,
     output_name: str | None = None,
 ) -> Path:
-    """Extract markers from Parquet and write TRC file."""
+    """Extract markers from Parquet and write TRC file using osimpy."""
+    from osimpy.io.trc import df_to_trc, TRCMetadata
+
     data_dir = Path(data_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -71,47 +143,22 @@ def parquet_to_trc(
     if markers_df.is_empty():
         raise ValueError(f"No marker data for {subject_id}/{session}/{trial_name}")
 
-    marker_names = sorted(markers_df["marker_name"].unique().to_list())
+    wide_df, marker_names = _markers_to_wide_df(markers_df)
     rate = _detect_rate(markers_df)
-    frames = markers_df.select(["time", "frame"]).unique().sort("frame")
-    n_frames = len(frames)
 
-    header_rows = [
-        f"PathFileType\t4\t(X/Y/Z)\t{output_name}",
-        f"DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames",
-        f"{rate}\t{rate}\t{n_frames}\t{len(marker_names)}\tmm\t{rate}\t1\t{n_frames}",
-        "Frame#\tTime\t" + "\t".join(f"{name}\t\t" for name in marker_names),
-        "\t\t" + "\t".join("X\tY\tZ" for _ in marker_names),
-    ]
-
-    data_rows = []
-    for frame_row in frames.iter_rows(named=True):
-        frame = frame_row["frame"]
-        time = frame_row["time"]
-        frame_markers = markers_df.filter(pl.col("frame") == frame)
-
-        coords = []
-        for name in marker_names:
-            marker = frame_markers.filter(pl.col("marker_name") == name)
-            if marker.is_empty():
-                coords.extend(["0", "0", "0"])
-            else:
-                x = float(marker["x"].to_list()[0])
-                y = float(marker["y"].to_list()[0])
-                z = float(marker["z"].to_list()[0])
-                v = np.array([x, y, z]) @ _VICON_TO_OPENSIM.T
-                coords.extend([f"{v[0]:.6f}", f"{v[1]:.6f}", f"{v[2]:.6f}"])
-
-        data_rows.append(f"{frame}\t{time:.6f}\t" + "\t".join(coords))
+    metadata = TRCMetadata(
+        name=output_name,
+        DataRate=rate,
+        CameraRate=rate,
+        NumFrames=len(wide_df),
+        NumMarkers=len(marker_names),
+        Units="mm",
+        MarkerNames=marker_names,
+    )
 
     output_path = output_dir / output_name
-    with open(output_path, "w") as f:
-        for row in header_rows:
-            f.write(row + "\n")
-        for row in data_rows:
-            f.write(row + "\n")
-
-    logger.info(f"  Wrote TRC: {output_path} ({n_frames} frames, {len(marker_names)} markers)")
+    df_to_trc(output_path, wide_df, metadata)
+    logger.info(f"  Wrote TRC: {output_path} ({len(wide_df)} frames, {len(marker_names)} markers)")
     return output_path
 
 
@@ -123,7 +170,10 @@ def parquet_to_fp_mot(
     output_dir: str | Path,
     output_prefix: str | None = None,
 ) -> tuple[Path, Path]:
-    """Extract force plate data from Parquet and write MOT + external loads XML."""
+    """Extract force plate data from Parquet and write MOT + external loads XML using osimpy."""
+    from osimpy.io.sto import df_to_sto, STOMetadata
+    from osimpy.io.forces import export_external_loads, OpenSimExternalForce
+
     data_dir = Path(data_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -135,77 +185,33 @@ def parquet_to_fp_mot(
     if fp_df.is_empty():
         raise ValueError(f"No force plate data for {subject_id}/{session}/{trial_name}")
 
-    fp_names = sorted(fp_df["fp_name"].unique().to_list())
+    wide_df, fp_names = _fp_to_wide_df(fp_df)
     rate = _detect_rate(fp_df)
-    frames = fp_df.select(["time", "frame"]).unique().sort("frame")
-    n_frames = len(frames)
 
-    header_rows = [
-        f"nRows={n_frames}",
-        f"nColumns={1 + len(fp_names) * 9}",
-        "endheader",
-        "time\t" + "\t".join(
-            f"{fp}_{var}_{axis}"
-            for fp in fp_names
-            for var in ["force", "moment", "cop"]
-            for axis in ["x", "y", "z"]
-        ),
-    ]
-
-    data_rows = []
-    for frame_row in frames.iter_rows(named=True):
-        frame = frame_row["frame"]
-        time = frame_row["time"]
-        frame_data = fp_df.filter(pl.col("frame") == frame)
-
-        values = []
-        for fp in fp_names:
-            for var in ["force", "moment", "cop"]:
-                for axis in ["x", "y", "z"]:
-                    val = frame_data.filter(
-                        (pl.col("fp_name") == fp)
-                        & (pl.col("variable") == var)
-                        & (pl.col("axis") == axis)
-                    )
-                    if val.is_empty():
-                        values.append("0")
-                    else:
-                        values.append(f"{float(val['value'].to_list()[0]):.6f}")
-
-        data_rows.append(f"{time:.6f}\t" + "\t".join(values))
+    metadata = STOMetadata(
+        name=f"{output_prefix}_forces.mot",
+        nRows=len(wide_df),
+        nColumns=len(wide_df.columns),
+        inDegrees="yes",
+    )
 
     mot_path = output_dir / f"{output_prefix}_forces.mot"
-    with open(mot_path, "w") as f:
-        for row in header_rows:
-            f.write(row + "\n")
-        for row in data_rows:
-            f.write(row + "\n")
+    df_to_sto(mot_path, wide_df, metadata)
+    logger.info(f"  Wrote MOT: {mot_path} ({len(wide_df)} frames, {len(fp_names)} plates)")
+
+    # Write external loads XML using osimpy
+    ext_forces = []
+    for fp in fp_names:
+        ext_forces.append(OpenSimExternalForce(
+            name=fp,
+            applied_to_body="calcn_r",
+            force_expressed_in_body="ground",
+            point_expressed_in_body="ground",
+            data_source_name=mot_path.name,
+        ))
 
     ext_loads_path = output_dir / f"{output_prefix}_ext_loads.xml"
-    _write_ext_loads_xml(ext_loads_path, fp_names, mot_path)
+    export_external_loads(str(ext_loads_path), ext_forces, datafile_name=mot_path.name)
+    logger.info(f"  Wrote ext loads: {ext_loads_path}")
 
-    logger.info(f"  Wrote MOT: {mot_path} ({n_frames} frames, {len(fp_names)} plates)")
     return mot_path, ext_loads_path
-
-
-def _write_ext_loads_xml(path: Path, fp_names: list[str], mot_path: Path) -> None:
-    xml_lines = [
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-        "<OpenSimDocument Version=\"40000\">",
-        "  <ExternalLoads>",
-        "    <objects>",
-    ]
-    for fp_name in fp_names:
-        xml_lines.extend([
-            f"      <ExternalLoad name=\"{fp_name}\">",
-            "        <applied_to_body>calcn_r</applied_to_body>",
-            "        <force_expressed_in_body>ground</force_expressed_in_body>",
-            "        <point_expressed_in_body>ground</point_expressed_in_body>",
-            "        <data_source_name>File</data_source_name>",
-            f"        <datafile>{mot_path.name}</datafile>",
-            "        <loads_capacity>6</loads_capacity>",
-            "      </ExternalLoad>",
-        ])
-    xml_lines.extend(["    </objects>", "  </ExternalLoads>", "</OpenSimDocument>"])
-    with open(path, "w") as f:
-        f.write("\n".join(xml_lines))
