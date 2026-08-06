@@ -104,11 +104,8 @@ def load_results(
         Long-format DataFrame with columns:
         time, coord, value, subject_id, session_id, trial_name
     """
-    import glob as globmod
-
     data_dir = Path(data_dir)
-    pattern = str(data_dir / "*" / f"{result_type}_results.parquet")
-    paths = sorted(globmod.glob(pattern))
+    paths = sorted(data_dir.glob(f"*/{result_type}_results.parquet"))
 
     if not paths:
         return pl.DataFrame()

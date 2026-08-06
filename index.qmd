@@ -81,22 +81,48 @@ All groups that received some form of TEMR treatment moved significantly slower 
 
 #### No Repair (NR)
 
-![](images/NR_kinematics.png)
-![](images/NR_kinetics.png)
+```{python}
+#| label: fig-nr-kinematics
+#| fig-cap: "No Repair group kinematics vs Control at week24"
+from scripts.plot_helpers import plot_group_kinematics
+plot_group_kinematics("data/processed", group="nr", session="week24")
+```
+```{python}
+#| label: fig-nr-kinetics
+#| fig-cap: "No Repair group kinetics vs Control at week24"
+from scripts.plot_helpers import plot_group_comparison
+plot_group_comparison("data/processed", group_a="nr", group_b="control", session="week24", result_type="id")
+```
 
 The primary differences seen in the injured subjects compared to the control dataset were an increased ankle dorsiflexion angle during mid-stance coupled with increases in the knee extension and hip internal rotation moments. These changes suggest that to compensate for the loss of plantarflexor function, the animals are adopting a gait strategy that reduces the demand on the ankle joint by increasing dorsiflexion and utilizing more proximal musculature to generate the necessary extension moments at the knee and hip. Effective therapies would be expected to mitigate these compensations and restore more normal kinematic and kinetic patterns.
 
 #### Healy Hydrogel (HH)
 
-![](images/HH_kinematics.png)
-![](images/HH_kinetics.png)
+```{python}
+#| label: fig-hh-kinematics
+#| fig-cap: "Healy Hydrogel group kinematics vs Control at week24"
+plot_group_kinematics("data/processed", group="hh", session="week24")
+```
+```{python}
+#| label: fig-hh-kinetics
+#| fig-cap: "Healy Hydrogel group kinetics vs Control at week24"
+plot_group_comparison("data/processed", group_a="hh", group_b="control", session="week24", result_type="id")
+```
 
 The Healy Hydrogel group demonstrated very similar kinematic and kinetic patterns to the No Repair group, with increased ankle dorsiflexion during mid-stance and elevated knee extension and hip internal rotation moments. Significance was also seen in some other kinematic measures, but this is likely a result of variability in marker placement. This suggests that the hydrogel alone did not provide sufficient functional recovery to alter the compensatory gait strategies observed in the No Repair group.
 
 #### Healy Sponge (HS)
 
-![](images/HS_kinematics.png)
-![](images/HS_kinetics.png)
+```{python}
+#| label: fig-hs-kinematics
+#| fig-cap: "Healy Sponge group kinematics vs Control at week24"
+plot_group_kinematics("data/processed", group="hs", session="week24")
+```
+```{python}
+#| label: fig-hs-kinetics
+#| fig-cap: "Healy Sponge group kinetics vs Control at week24"
+plot_group_comparison("data/processed", group_a="hs", group_b="control", session="week24", result_type="id")
+```
 
 The Healy Sponge group exhibited kinematic and kinetic patterns more similar to the Control group compared to the No Repair and Healy Hydrogel groups. While some significant difference remained in the knee extension moment, the curve shifted away from the trajectory seen in the No Repair group and towards the Control group, and the overall patterns suggested a trend toward normalization of gait mechanics. The difference in ankle dorsiflexion angle did not reach the level of significance compared to either the Control or No Repair groups, but visual inspection of the curves suggests it is still closer to the No Repair values, and the lack of significance is more likely a result of a higher variance. This indicates that the sponge may have provided a more conducive environment for muscle regeneration or functional compensation compared to the hydrogel.
 
@@ -106,18 +132,42 @@ Many of the TEMR groups exhibited similar patterns and will be analyzed together
 
 #### Tissue-Engineered Muscle Repair (TEMR)
 
-![](images/TEMR_kinematics.png)
-![](images/TEMR_kinetics.png)
+```{python}
+#| label: fig-temr-kinematics
+#| fig-cap: "TEMR group kinematics vs Control at week24"
+plot_group_kinematics("data/processed", group="temr", session="week24")
+```
+```{python}
+#| label: fig-temr-kinetics
+#| fig-cap: "TEMR group kinetics vs Control at week24"
+plot_group_comparison("data/processed", group_a="temr", group_b="control", session="week24", result_type="id")
+```
 
 #### TEMR and Hydrogel (TEMR+HH)
 
-![](images/TEMR_HH_kinematics.png)
-![](images/TEMR_HH_kinetics.png)
+```{python}
+#| label: fig-temr-hh-kinematics
+#| fig-cap: "TEMR+HH group kinematics vs Control at week24"
+plot_group_kinematics("data/processed", group="temr_hh", session="week24")
+```
+```{python}
+#| label: fig-temr-hh-kinetics
+#| fig-cap: "TEMR+HH group kinetics vs Control at week24"
+plot_group_comparison("data/processed", group_a="temr_hh", group_b="control", session="week24", result_type="id")
+```
 
 #### TEMR and Keratin Gel (TEMR+KG)
 
-![](images/TEMR_KG_kinematics.png)
-![](images/TEMR_KG_kinetics.png)
+```{python}
+#| label: fig-temr-kg-kinematics
+#| fig-cap: "TEMR+KG group kinematics vs Control at week24"
+plot_group_kinematics("data/processed", group="temr_kg", session="week24")
+```
+```{python}
+#| label: fig-temr-kg-kinetics
+#| fig-cap: "TEMR+KG group kinetics vs Control at week24"
+plot_group_comparison("data/processed", group_a="temr_kg", group_b="control", session="week24", result_type="id")
+```
 
 Kinematically, the ankle dorsiflexion angle is still significantly elevated in mid-stance compared to Control. The kinetic profile across all three TEMR groups is similar, with decreased knee extension moment during stance compared to the No Repair group but still significantly greater than the Control group. Similarly, the hip internal rotation moments are significantly greater than Control in mid-stance, akin to the No Repair group. A unique adaptation that surfaces in the TEMR groups is a decrease in ankle plantarflexion moment compared to both the Control and No Repair groups during mid-stance. These findings suggest that while the TEMR treatments may not fully restore normal gait mechanics, they do introduce unique compensatory strategies, particularly at the ankle joint.
  
@@ -134,75 +184,3 @@ In this study, joint moments were normalized to body mass multiplied by total le
 ## Conclusion
 
 Volumetric muscle loss causes functional impairments that are not adequately addressed by current clinical practice. This study provides a broad comparison of the long-term functional efficacy of several preclinical regenerative strategies. We found that while no treatment achieved a full return to uninjured function, therapies incorporating a specific sponge material produced modest but significant trends toward functional healing, demonstrating mitigated pathological gait compensations. This work emphasizes the utility and importance of detailed biomechanical assessment in evaluating VML treatments and highlights the potential of biomaterials to enhance regenerative outcomes.
-
-## Analysis Pipeline
-
-The analysis pipeline reads from Parquet files generated by the movedb-core ingestion pipeline. The following code demonstrates how to aggregate and compare groups using the `rat_vml.analysis.aggregation` module.
-
-### Loading and Aggregating Results
-
-```python
-from rat_vml.analysis.aggregation import load_results, aggregate_by_group, compare_groups
-
-# Load IK results for week24
-results = load_results("data/processed", result_type="ik", session="week24")
-
-# Aggregate by group
-control = aggregate_by_group(results, group="control", session="week24")
-nr = aggregate_by_group(results, group="nr", session="week24")
-
-print(f"Control: {control.n_subjects} subjects")
-print(f"NR: {nr.n_subjects} subjects")
-```
-
-### Comparing Groups
-
-```python
-# Compare No Repair vs Control
-comparison = compare_groups(nr, control)
-
-# Access SPM t-test results per coordinate
-for coord, spm_result in comparison.spm_results.items():
-    if spm_result is not None:
-        print(f"{coord}: {spm_result}")
-```
-
-### Generating Figures
-
-```python
-from scripts.plot_helpers import plot_group_kinematics, plot_group_comparison
-
-# Plot kinematics for NR vs Control
-fig = plot_group_kinematics(
-    data_dir="data/processed",
-    group="nr",
-    session="week24",
-    output_path="figures/NR_kinematics.png",
-)
-
-# Plot SPM comparison
-fig = plot_group_comparison(
-    data_dir="data/processed",
-    group_a="nr",
-    group_b="control",
-    session="week24",
-    result_type="ik",
-    output_path="figures/NR_vs_Control_spm.png",
-)
-```
-
-### Treatment Group Comparisons
-
-```python
-# Generate figures for all treatment groups
-groups = ["nr", "temr", "hh", "hs", "temr_hh", "temr_kg"]
-
-for group in groups:
-    fig = plot_group_kinematics(
-        data_dir="data/processed",
-        group=group,
-        session="week24",
-        output_path=f"figures/{group}_kinematics.png",
-    )
-    plt.close(fig)
-```
