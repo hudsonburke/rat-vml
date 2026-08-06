@@ -1,18 +1,24 @@
 # DVC pipeline parameters for rat-vml analysis
+# Mirrors osimpy parameter names where applicable
 
-# Subject definitions (populated from subjects.csv)
+# Subject definitions (populated from subjects.csv or Parquet metadata)
+# Each subject needs: id, session, model, mass, femur_length_l/r, tibia_length_l/r
 subjects: {}
 
-# IK parameters
+# Valid trials (populated by catalog query)
+# Each trial needs: subject, session, trial
+trials: {}
+
+# IK parameters (mirrors osimpy.tools.IKSettings)
 ik:
   marker_weight: 1.0
   max_iterations: 200
 
-# ID parameters
+# ID parameters (mirrors osimpy.tools.IDSettings)
 id:
   cutoff_freq: 6.0
 
-# MocoInverse parameters
+# MocoInverse parameters (mirrors osimpy.moco.inverse.MocoInverseSettings)
 moco:
   mesh_interval: 0.02
   replace_muscles_with_dgf: true
