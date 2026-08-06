@@ -49,7 +49,7 @@ from .events import (
     check_marker_gaps,
 )
 from .forces import process_force_plate, zero_outside_gait_cycle, write_external_loads_xml
-from .io import rrd_to_trc, rrd_to_fp_mot
+from .parquet_io import parquet_to_trc, parquet_to_fp_mot
 
 
 # ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ def run_subject(
     subject_id: str,
     session: str,
     group: str,
-    rrd_path: Path,
+    data_dir: Path,
     output_dir: Path,
     side: str = "right",
     subject_mass: float | None = None,
@@ -440,8 +440,8 @@ def run_subject(
         Session name (e.g. "Baseline", "Week24").
     group : str
         Treatment group name.
-    rrd_path : Path
-        Path to the .rrd file for this subject.
+    data_dir : Path
+        Directory containing subject Parquet files (from movedb-core ingestion).
     output_dir : Path
         Directory for all output files.
     side : str
@@ -472,14 +472,14 @@ def run_subject(
             )
         result.scaled_model = model_path
 
-        # Step 2: Find valid walking trials from .rrd catalog
-        from .queries import RerunCatalog
-        cat = RerunCatalog(rrd_path.parent)
+        # Step 2: Find valid walking trials from Parquet catalog
+        from .parquet_catalog import ParquetCatalog
+        data_dir = Path(data_dir)
+        cat = ParquetCatalog(data_dir)
         valid_trials = cat.valid_walking_trials(min_events=min_events, session=session)
-        cat.close()
 
         # Filter to this subject
-        subject_trials = valid_trials.filter(pl.col("subject") == subject_id)
+        subject_trials = valid_trials.filter(pl.col("subject_id") == subject_id)
         if subject_trials.is_empty():
             logger.warning(f"No valid walking trials found for {subject_id}/{session}")
             return result
@@ -495,24 +495,19 @@ def run_subject(
             )
 
             try:
-                # Extract TRC from .rrd
+                # Extract TRC from Parquet
                 trc_path = output_dir / "trials" / trial_name / f"{trial_name}.trc"
                 if not trc_path.exists() and not skip_ik:
-                    logger.info(f"  Extracting TRC from .rrd for {trial_name}")
-                    rrd_to_trc(rrd_path, entity_prefix, trc_path.parent,
-                               output_name=f"{trial_name}.trc")
+                    logger.info(f"  Extracting TRC from Parquet for {trial_name}")
+                    parquet_to_trc(data_dir, subject_id, session, trial_name,
+                                   trc_path.parent, output_name=f"{trial_name}.trc")
 
-                # Extract FP MOT from .rrd
+                # Extract FP MOT from Parquet
                 ext_loads_path = output_dir / "trials" / trial_name / f"{trial_name}_ext_loads.xml"
                 if not ext_loads_path.exists() and not skip_id:
-                    logger.info(f"  Extracting force plate data from .rrd for {trial_name}")
-                    rrd_to_fp_mot(
-                        rrd_path, entity_prefix,
-                        events=GaitEvents(
-                            left_foot_strike=[], left_foot_off=[],
-                            right_foot_strike=[], right_foot_off=[],
-                            total_frames=0, frame_rate=200.0,
-                        ),
+                    logger.info(f"  Extracting force plate data from Parquet for {trial_name}")
+                    parquet_to_fp_mot(
+                        data_dir, subject_id, session, trial_name,
                         output_dir=output_dir / "trials" / trial_name,
                         output_prefix=trial_name,
                     )
