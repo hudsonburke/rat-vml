@@ -229,3 +229,63 @@ def filter_forceplate_wide(
     )
 
     return wide
+
+
+def zero_outside_gait_cycle(
+    fp_df: pl.DataFrame,
+    events_df: pl.DataFrame,
+) -> pl.DataFrame:
+    """Zero force plate data outside the gait cycle window.
+
+    Each force plate is zeroed outside the first foot strike to last foot strike
+    window for its corresponding side (left/right).
+    """
+    if events_df.is_empty():
+        return fp_df
+
+    # Get foot strike times for each side
+    left_strikes = events_df.filter(
+        (pl.col("context") == "Left") & (pl.col("label") == "Foot Strike")
+    )["time"].to_list()
+
+    right_strikes = events_df.filter(
+        (pl.col("context") == "Right") & (pl.col("label") == "Foot Strike")
+    )["time"].to_list()
+
+    left_start = min(left_strikes) if left_strikes else 0
+    left_end = max(left_strikes) if left_strikes else float("inf")
+    right_start = min(right_strikes) if right_strikes else 0
+    right_end = max(right_strikes) if right_strikes else float("inf")
+
+    # Map force plate names to sides
+    fp_names = fp_df["fp_name"].unique().to_list()
+    fp_sides = {}
+    for name in fp_names:
+        name_lower = name.lower()
+        if "left" in name_lower or "1" in name_lower:
+            fp_sides[name] = "left"
+        elif "right" in name_lower or "2" in name_lower:
+            fp_sides[name] = "right"
+        else:
+            fp_sides[name] = "unknown"
+
+    def _zero_outside(group_df: pl.DataFrame) -> pl.DataFrame:
+        fp_name = group_df["fp_name"][0]
+        side = fp_sides.get(fp_name, "unknown")
+        if side == "left":
+            start, end = left_start, left_end
+        elif side == "right":
+            start, end = right_start, right_end
+        else:
+            return group_df
+        return group_df.with_columns(
+            pl.when((pl.col("time") < start) | (pl.col("time") > end))
+            .then(0.0).otherwise(pl.col("value")).alias("value")
+        )
+
+    result = fp_df.group_by("fp_name", "trial_name", maintain_order=True).map_groups(
+        lambda g: _zero_outside(g)
+    )
+
+    logger.info("Zeroed force plates outside gait cycle")
+    return result
