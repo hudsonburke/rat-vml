@@ -196,6 +196,9 @@ def scale_model_for_subject(
     output_dir: Path,
     side: str = "right",
     foot_length: float = 0.0,
+    lfemur_length: float | None = None,
+    ltibia_length: float | None = None,
+    lfoot_length: float | None = None,
 ) -> Path:
     """Scale bilateral rat model using rathindlimb.scale.scale_opensim_model.
 
@@ -209,10 +212,10 @@ def scale_model_for_subject(
         Mass=mass,
         RFemurLength=femur_length,
         RTibiaLength=tibia_length,
-        LFemurLength=femur_length,
-        LTibiaLength=tibia_length,
+        LFemurLength=lfemur_length if lfemur_length is not None else femur_length,
+        LTibiaLength=ltibia_length if ltibia_length is not None else tibia_length,
         RFootLength=foot_length,
-        LFootLength=foot_length,
+        LFootLength=lfoot_length if lfoot_length is not None else foot_length,
     )
 
     scale_opensim_model(
