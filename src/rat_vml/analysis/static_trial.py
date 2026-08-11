@@ -2,7 +2,7 @@
 
 Provides functions to:
 - Find static trials in Parquet data
-- Detect and remove frames with marker gaps
+- Filter to frames with complete named markers
 - Write clean TRC files for OpenSim scaling
 """
 
@@ -15,9 +15,21 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
+# Named markers used for scaling (not numeric markers like *0, *1)
+NAMED_MARKERS = [
+    "RTOE", "RHEE", "RANK", "RMKM", "RLML",
+    "LTOE", "LHEE", "LANK", "LMKL", "LLML",
+    "RASI", "LASI", "RPSI", "LPSI",
+    "RKNM", "RKNL", "LKNM", "LKNL",
+    "RTIB", "LTIB",
+]
+
 
 def find_static_trial(markers_df: pl.DataFrame) -> pl.DataFrame | None:
     """Find the static trial in a markers DataFrame.
+
+    Prefers the last static trial (e.g. Static02 over Static01).
+    Falls back to earlier trials if the last one has no clean frames.
 
     Parameters
     ----------
@@ -31,119 +43,105 @@ def find_static_trial(markers_df: pl.DataFrame) -> pl.DataFrame | None:
         Filtered DataFrame for the static trial, or None if not found.
     """
     # Find trials with "static" in the name (case-insensitive)
-    static_trials = markers_df.filter(
-        pl.col("trial_name").str.to_lowercase().str.contains("static")
-    )
+    static_mask = pl.col("trial_name").str.to_lowercase().str.contains("static")
+    static_trials = markers_df.filter(static_mask)
 
     if static_trials.is_empty():
         logger.warning("No static trial found")
         return None
 
-    # Get the first static trial
-    trial_name = static_trials["trial_name"].unique()[0]
-    logger.info(f"Found static trial: {trial_name}")
+    # Get static trial names, prefer last one
+    trial_names = sorted(static_trials["trial_name"].unique().to_list(), reverse=True)
 
-    return static_trials.filter(pl.col("trial_name") == trial_name)
+    for trial_name in trial_names:
+        trial_df = markers_df.filter(pl.col("trial_name") == trial_name)
+
+        # Filter to named markers only
+        named_df = trial_df.filter(pl.col("marker_name").is_in(NAMED_MARKERS))
+
+        # Check if we have at least one frame with all named markers present
+        frames_with_all = named_df.group_by("frame").agg(
+            pl.col("marker_name").n_unique().alias("n_markers")
+        ).filter(pl.col("n_markers") >= len(NAMED_MARKERS) // 2)  # At least half the markers
+
+        if not frames_with_all.is_empty():
+            logger.info(f"Using static trial: {trial_name}")
+            return trial_df
+
+    logger.warning("No static trial with complete frames found")
+    return None
 
 
-def detect_marker_gaps(
+def filter_complete_frames(
     markers_df: pl.DataFrame,
-    threshold: float = 0.0,
+    min_markers: int = 10,
 ) -> pl.DataFrame:
-    """Detect frames with marker gaps (all-zero positions).
+    """Filter to frames where enough named markers are present.
 
     Parameters
     ----------
     markers_df : pl.DataFrame
-        Markers DataFrame with columns: frame, time, marker_name, x, y, z.
-    threshold : float
-        Values at or below this threshold are considered missing.
+        Markers DataFrame.
+    min_markers : int
+        Minimum number of named markers required per frame.
 
     Returns
     -------
     pl.DataFrame
-        DataFrame with additional column 'has_gap' (bool) indicating
-        which frames have gaps.
+        Filtered DataFrame with only complete frames.
     """
-    # A frame has a gap if any marker has all coordinates at or below threshold
-    marker_cols = ["x", "y", "z"]
+    # Filter to named markers only
+    named_df = markers_df.filter(pl.col("marker_name").is_in(NAMED_MARKERS))
 
-    # Check if all coordinates are at or below threshold for each marker
-    markers_df = markers_df.with_columns(
-        ((pl.col("x").abs() <= threshold) &
-         (pl.col("y").abs() <= threshold) &
-         (pl.col("z").abs() <= threshold)).alias("marker_gap")
+    # Count markers per frame
+    frame_counts = named_df.group_by("frame").agg(
+        pl.col("marker_name").n_unique().alias("n_markers")
     )
 
-    # Aggregate per frame: a frame has a gap if ANY marker has a gap
-    frame_gaps = markers_df.group_by("frame").agg(
-        pl.col("marker_gap").any().alias("has_gap")
-    )
+    # Keep frames with enough markers
+    good_frames = frame_counts.filter(pl.col("n_markers") >= min_markers)["frame"]
 
-    # Join back to get has_gap per frame
-    markers_df = markers_df.join(frame_gaps, on="frame", how="left")
+    result = markers_df.filter(pl.col("frame").is_in(good_frames))
+    n_removed = markers_df["frame"].n_unique() - result["frame"].n_unique()
 
-    return markers_df
-
-
-def remove_gap_frames(markers_df: pl.DataFrame) -> pl.DataFrame:
-    """Remove frames with marker gaps.
-
-    Parameters
-    ----------
-    markers_df : pl.DataFrame
-        Markers DataFrame with 'has_gap' column from detect_marker_gaps().
-
-    Returns
-    -------
-    pl.DataFrame
-        DataFrame with gap frames removed.
-    """
-    if "has_gap" not in markers_df.columns:
-        markers_df = detect_marker_gaps(markers_df)
-
-    n_before = markers_df["frame"].n_unique()
-    markers_df = markers_df.filter(~pl.col("has_gap"))
-    n_after = markers_df["frame"].n_unique()
-
-    n_removed = n_before - n_after
     if n_removed > 0:
-        logger.info(f"Removed {n_removed} frames with marker gaps ({n_before} -> {n_after})")
+        logger.info(f"Removed {n_removed} frames with insufficient markers")
 
-    return markers_df.drop("has_gap", "marker_gap")
+    return result
 
 
 def find_clean_frame(markers_df: pl.DataFrame) -> int | None:
-    """Find a single frame with no marker gaps.
+    """Find a single frame with complete named markers.
 
     Parameters
     ----------
     markers_df : pl.DataFrame
-        Markers DataFrame with columns: frame, marker_name, x, y, z.
+        Markers DataFrame.
 
     Returns
     -------
     int or None
-        Frame number with no gaps, or None if all frames have gaps.
+        Frame number with complete markers, or None if not found.
     """
-    marker_cols = ["x", "y", "z"]
+    # Filter to named markers
+    named_df = markers_df.filter(pl.col("marker_name").is_in(NAMED_MARKERS))
 
-    # Check if any marker has all zeros at each frame
-    has_gap = markers_df.group_by("frame").agg(
-        ((pl.col("x").abs() <= 0.0) &
-         (pl.col("y").abs() <= 0.0) &
-         (pl.col("z").abs() <= 0.0)).any().alias("has_gap")
+    # Count markers per frame
+    frame_counts = named_df.group_by("frame").agg(
+        pl.col("marker_name").n_unique().alias("n_markers")
     )
 
-    # Find first frame without gaps
-    clean_frames = has_gap.filter(~pl.col("has_gap"))
+    # Find frame with most markers
+    best_frame = frame_counts.sort("n_markers", descending=True)
 
-    if clean_frames.is_empty():
-        logger.warning("No clean frame found (all frames have gaps)")
+    if best_frame.is_empty():
+        logger.warning("No clean frame found")
         return None
 
-    frame = clean_frames["frame"][0]
-    logger.info(f"Found clean frame: {frame}")
+    frame = best_frame["frame"][0]
+    n_markers = best_frame["n_markers"][0]
+    logger.info(f"Found clean frame: {frame} ({n_markers} markers)")
+
     return frame
 
 
@@ -155,8 +153,8 @@ def prepare_static_trial_for_scaling(
 ) -> Path | None:
     """Prepare a clean static trial TRC file for OpenSim scaling.
 
-    Finds the static trial, removes frames with marker gaps, and writes
-    a TRC file suitable for scaling.
+    Finds the static trial, filters to frames with complete markers,
+    and writes a TRC file suitable for scaling.
 
     Parameters
     ----------
@@ -181,11 +179,11 @@ def prepare_static_trial_for_scaling(
     if static_df is None:
         return None
 
-    # Remove frames with gaps
-    static_df = remove_gap_frames(static_df)
+    # Filter to frames with complete markers
+    static_df = filter_complete_frames(static_df)
 
     if static_df.is_empty():
-        logger.error("Static trial has no clean frames after gap removal")
+        logger.error("Static trial has no complete frames")
         return None
 
     # Find a clean frame for reference
