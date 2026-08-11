@@ -60,9 +60,12 @@ def load_session_params(data_dir: Path, subject_id: str, session_id: str) -> dic
     # Map C3D PROCESSING parameter names to our function args
     params = {
         "mass": row.get("Mass", 0.0),
-        "femur_length": row.get("RFemurLength", 0.0),
-        "tibia_length": row.get("RTibiaLength", 0.0),
-        "foot_length": row.get("RFootLength", 0.0),
+        "rfemur_length": row.get("RFemurLength", 0.0),
+        "rtibia_length": row.get("RTibiaLength", 0.0),
+        "rfoot_length": row.get("RFootLength", 0.0),
+        "lfemur_length": row.get("LFemurLength", 0.0),
+        "ltibia_length": row.get("LTibiaLength", 0.0),
+        "lfoot_length": row.get("LFootLength", 0.0),
     }
 
     # Log extracted parameters
@@ -94,10 +97,13 @@ def main():
         base_model=Path(args.model),
         subject_name=f"{args.subject}_{args.session}",
         mass=params["mass"],
-        femur_length=params["femur_length"],
-        tibia_length=params["tibia_length"],
+        femur_length=params["rfemur_length"],
+        tibia_length=params["rtibia_length"],
         output_dir=output_dir,
-        foot_length=params["foot_length"],
+        foot_length=params["rfoot_length"],
+        lfemur_length=params["lfemur_length"],
+        ltibia_length=params["ltibia_length"],
+        lfoot_length=params["lfoot_length"],
     )
 
     logger.info(f"Scaled model: {scaled_path}")
