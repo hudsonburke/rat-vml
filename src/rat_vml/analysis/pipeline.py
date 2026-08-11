@@ -194,7 +194,7 @@ def scale_model_for_subject(
     r_femur_length: float,
     r_tibia_length: float,
     output_dir: Path,
-    r_foot_length: float = 0.0,
+    r_foot_length: float,
     l_femur_length: float | None = None,
     l_tibia_length: float | None = None,
     l_foot_length: float | None = None,
