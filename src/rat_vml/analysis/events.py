@@ -301,6 +301,163 @@ def get_gait_cycle_times(events: GaitEvents, side: str = "right") -> dict:
     }
 
 
+
+# Valid walking trial event sequences (7 events)
+# Right side starts first
+RIGHT_START_SEQUENCE = [
+    ("Right", "Foot Strike"),
+    ("Left", "Foot Off"),
+    ("Left", "Foot Strike"),
+    ("Right", "Foot Off"),
+    ("Right", "Foot Strike"),
+    ("Left", "Foot Off"),
+    ("Left", "Foot Strike"),
+]
+
+# Left side starts first
+LEFT_START_SEQUENCE = [
+    ("Left", "Foot Strike"),
+    ("Right", "Foot Off"),
+    ("Right", "Foot Strike"),
+    ("Left", "Foot Off"),
+    ("Left", "Foot Strike"),
+    ("Right", "Foot Off"),
+    ("Right", "Foot Strike"),
+]
+
+
+def validate_walking_events(
+    events_df: "pl.DataFrame",
+    required_markers: list[str] | None = None,
+) -> tuple[bool, str, list[dict]]:
+    """Validate walking trial events from Parquet data.
+
+    Checks:
+    1. Exactly 7 events in correct alternating order
+    2. Correct context/label pairs (Right/Left + Foot Strike/Foot Off)
+    3. Required markers present (no gaps)
+
+    Parameters
+    ----------
+    events_df : pl.DataFrame
+        Events DataFrame with columns: time, context, label, frame,
+        subject_id, session_id, trial_name.
+    required_markers : list[str] or None
+        If provided, check that these markers are present in the trial.
+
+    Returns
+    -------
+    (is_valid, reason, violations)
+        True if trial passes, reason string, list of violation details.
+    """
+    import polars as pl
+
+    violations = []
+
+    # Get events for this trial
+    if events_df.is_empty():
+        return False, "no events found", [{"type": "no_events"}]
+
+    # Sort by time
+    events_df = events_df.sort("time")
+
+    # Check exactly 7 events
+    n_events = len(events_df)
+    if n_events != 7:
+        violations.append({
+            "type": "event_count",
+            "expected": 7,
+            "actual": n_events,
+        })
+        return False, f"expected 7 events, got {n_events}", violations
+
+    # Extract context/label pairs
+    event_sequence = [
+        (row["context"], row["label"])
+        for row in events_df.iter_rows(named=True)
+    ]
+
+    # Check against both valid sequences
+    is_right_start = event_sequence == RIGHT_START_SEQUENCE
+    is_left_start = event_sequence == LEFT_START_SEQUENCE
+
+    if not is_right_start and not is_left_start:
+        violations.append({
+            "type": "event_order",
+            "expected": "Right FS → Left FO → Left FS → Right FO → Right FS → Left FO → Left FS (or left-start variant)",
+            "actual": " → ".join(f"{c} {l}" for c, l in event_sequence),
+        })
+        return False, "event sequence does not match expected pattern", violations
+
+    return True, "valid", violations
+
+
+def find_valid_walking_trials(
+    markers_df: "pl.DataFrame",
+    events_df: "pl.DataFrame",
+    required_markers: list[str] | None = None,
+) -> list[str]:
+    """Find valid walking trials in a session.
+
+    A trial is valid if:
+    1. It has exactly 7 events in correct alternating order
+    2. It is not a static trial
+    3. Required markers are present (no gaps)
+
+    Parameters
+    ----------
+    markers_df : pl.DataFrame
+        Markers DataFrame for the session.
+    events_df : pl.DataFrame
+        Events DataFrame for the session.
+    required_markers : list[str] or None
+        Markers that must be present. If None, uses default set.
+
+    Returns
+    -------
+    list of str
+        List of valid trial names.
+    """
+    import polars as pl
+
+    if required_markers is None:
+        from .static_trial import REQUIRED_MARKERS
+        required_markers = REQUIRED_MARKERS
+
+    # Get unique trial names
+    trial_names = markers_df["trial_name"].unique().to_list()
+
+    valid_trials = []
+    for trial_name in trial_names:
+        # Skip static trials
+        if "static" in trial_name.lower():
+            continue
+
+        # Get events for this trial
+        trial_events = events_df.filter(pl.col("trial_name") == trial_name)
+
+        # Validate events
+        is_valid, reason, violations = validate_walking_events(trial_events)
+
+        if not is_valid:
+            logger.debug(f"  {trial_name}: {reason}")
+            continue
+
+        # Check required markers
+        trial_markers = markers_df.filter(pl.col("trial_name") == trial_name)
+        present_markers = set(trial_markers["marker_name"].unique().to_list())
+        missing = set(required_markers) - present_markers
+
+        if missing:
+            logger.debug(f"  {trial_name}: missing markers {missing}")
+            continue
+
+        valid_trials.append(trial_name)
+
+    logger.info(f"Found {len(valid_trials)}/{len(trial_names)} valid walking trials")
+    return valid_trials
+
+
 def check_marker_gaps(
     marker_data: dict[str, np.ndarray],
     threshold: float = 0.0,
