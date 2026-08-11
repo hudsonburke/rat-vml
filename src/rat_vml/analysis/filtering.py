@@ -231,25 +231,14 @@ def filter_forceplate_wide(
     return wide
 
 
-# Default force plate to side mapping for rat hindlimb lab
-# Plates 2,3 = left side; Plates 4,5 = right side
-DEFAULT_FP_SIDE_MAP = {
-    "Bertec_Force_Plate_2": "left",
-    "Bertec_Force_Plate_3": "left",
-    "Bertec_Force_Plate_4": "right",
-    "Bertec_Force_Plate_5": "right",
-}
-
-
 def zero_outside_gait_cycle(
     fp_df: pl.DataFrame,
     events_df: pl.DataFrame,
-    fp_side_map: dict[str, str] | None = None,
 ) -> pl.DataFrame:
     """Zero force plate data outside the gait cycle window.
 
-    Each force plate is zeroed outside the first foot strike to last foot strike
-    window for its corresponding side (left/right).
+    All force plates are zeroed outside the first foot strike to last foot strike
+    window across all sides.
 
     Parameters
     ----------
@@ -257,48 +246,24 @@ def zero_outside_gait_cycle(
         Force plates DataFrame (long format).
     events_df : pl.DataFrame
         Events DataFrame with columns: time, context, label.
-    fp_side_map : dict or None
-        Mapping of force plate names to sides ("left"/"right").
-        If None, uses DEFAULT_FP_SIDE_MAP.
     """
     if events_df.is_empty():
         return fp_df
 
-    if fp_side_map is None:
-        fp_side_map = DEFAULT_FP_SIDE_MAP
+    # Get all foot strike times
+    strikes = events_df.filter(pl.col("label") == "Foot Strike")["time"].to_list()
 
-    # Get foot strike times for each side
-    left_strikes = events_df.filter(
-        (pl.col("context") == "Left") & (pl.col("label") == "Foot Strike")
-    )["time"].to_list()
+    if not strikes:
+        return fp_df
 
-    right_strikes = events_df.filter(
-        (pl.col("context") == "Right") & (pl.col("label") == "Foot Strike")
-    )["time"].to_list()
+    gait_start = min(strikes)
+    gait_end = max(strikes)
 
-    left_start = min(left_strikes) if left_strikes else 0
-    left_end = max(left_strikes) if left_strikes else float("inf")
-    right_start = min(right_strikes) if right_strikes else 0
-    right_end = max(right_strikes) if right_strikes else float("inf")
-
-    def _zero_outside(group_df: pl.DataFrame) -> pl.DataFrame:
-        fp_name = group_df["fp_name"][0]
-        side = fp_side_map.get(fp_name, "unknown")
-        if side == "left":
-            start, end = left_start, left_end
-        elif side == "right":
-            start, end = right_start, right_end
-        else:
-            logger.warning(f"Force plate {fp_name} has no side mapping, skipping zeroing")
-            return group_df
-        return group_df.with_columns(
-            pl.when((pl.col("time") < start) | (pl.col("time") > end))
-            .then(0.0).otherwise(pl.col("value")).alias("value")
-        )
-
-    result = fp_df.group_by("fp_name", "trial_name", maintain_order=True).map_groups(
-        lambda g: _zero_outside(g)
+    # Zero all force plates outside gait cycle
+    result = fp_df.with_columns(
+        pl.when((pl.col("time") < gait_start) | (pl.col("time") > gait_end))
+        .then(0.0).otherwise(pl.col("value")).alias("value")
     )
 
-    logger.info("Zeroed force plates outside gait cycle")
+    logger.info(f"Zeroed force plates outside gait cycle ({gait_start:.2f}-{gait_end:.2f}s)")
     return result
