@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Scale model for a subject.
 
-Reads anthropometrics from sessions.parquet, prepares a clean static trial
-with filtered markers, and scales the base model.
+Reads anthropometrics from sessions.parquet, finds clean static trial,
+filters markers, and scales the base model.
 
 Usage::
 
@@ -16,8 +16,12 @@ from pathlib import Path
 import polars as pl
 
 from rat_vml.analysis.pipeline import scale_model_for_subject
-from rat_vml.analysis.static_trial import prepare_static_trial_for_scaling
-from rat_vml.analysis.filtering import prepare_static_trial_for_trc
+from rat_vml.analysis.static_trial import (
+    find_static_trial,
+    find_clean_frame,
+    REQUIRED_MARKERS,
+)
+from rat_vml.analysis.filtering import filter_markers, markers_to_wide_trc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,8 +32,7 @@ def load_session_params(data_dir: Path, subject_id: str, session_id: str) -> dic
     sessions_path = data_dir / subject_id / "sessions.parquet"
     if not sessions_path.exists():
         raise FileNotFoundError(
-            f"sessions.parquet not found for {subject_id}. "
-            f"Run convert.py to generate it."
+            f"sessions.parquet not found for {subject_id}. Run convert.py to generate it."
         )
 
     df = pl.read_parquet(sessions_path)
@@ -38,12 +41,10 @@ def load_session_params(data_dir: Path, subject_id: str, session_id: str) -> dic
     if session_row.is_empty():
         available = df["session_id"].unique().to_list()
         raise ValueError(
-            f"Session '{session_id}' not found for {subject_id}. "
-            f"Available: {available}"
+            f"Session '{session_id}' not found for {subject_id}. Available: {available}"
         )
 
     row = session_row.to_dicts()[0]
-
     params = {
         "mass": row.get("Mass", 0.0),
         "r_femur_length": row.get("RFemurLength", 0.0),
@@ -61,16 +62,6 @@ def load_session_params(data_dir: Path, subject_id: str, session_id: str) -> dic
     return params
 
 
-def load_markers(data_dir: Path, subject_id: str, session_id: str) -> pl.DataFrame:
-    """Load markers DataFrame for a session."""
-    markers_path = data_dir / subject_id / "markers.parquet"
-    if not markers_path.exists():
-        raise FileNotFoundError(f"markers.parquet not found for {subject_id}")
-
-    df = pl.read_parquet(markers_path)
-    return df.filter(pl.col("session_id") == session_id)
-
-
 def main():
     parser = argparse.ArgumentParser(description="Scale model for a subject")
     parser.add_argument("--data-dir", required=True, help="Processed Parquet data directory")
@@ -85,26 +76,36 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load anthropometrics from sessions.parquet
+    # Load anthropometrics
     params = load_session_params(data_dir, args.subject, args.session)
 
-    # Load markers and prepare filtered static trial TRC
-    markers_df = load_markers(data_dir, args.subject, args.session)
+    # Load markers
+    markers_path = data_dir / args.subject / "markers.parquet"
+    markers_df = pl.read_parquet(markers_path).filter(pl.col("session_id") == args.session)
 
-    # Filter and prepare static trial
-    static_wide = prepare_static_trial_for_trc(
-        markers_df=markers_df,
-        cutoff_hz=args.cutoff,
-    )
-
-    if static_wide is None:
-        logger.error("Could not prepare static trial for scaling")
+    # Find static trial (reuses static_trial.py)
+    static_df = find_static_trial(markers_df)
+    if static_df is None:
+        logger.error("No static trial found")
         return
+
+    # Find clean frame (reuses static_trial.py)
+    clean_frame = find_clean_frame(static_df)
+    if clean_frame is None:
+        logger.error("No clean frame in static trial")
+        return
+
+    # Filter to clean frame, then filter markers
+    frame_df = static_df.filter(pl.col("frame") == clean_frame)
+    filtered = filter_markers(frame_df, cutoff_hz=args.cutoff)
+
+    # Convert to wide TRC format
+    wide = markers_to_wide_trc(filtered)
 
     # Write TRC file
     from osimpy.io.trc import df_to_trc
     trc_path = output_dir / f"{args.subject}_{args.session}_static.trc"
-    df_to_trc(static_wide, trc_path, frame_rate=200.0)
+    df_to_trc(wide, trc_path, frame_rate=200.0)
     logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model
