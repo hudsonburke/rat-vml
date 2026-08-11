@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Scale model for a subject.
 
-Reads anthropometrics from sessions.parquet, prepares a clean static trial,
-and scales the base model.
+Reads anthropometrics from sessions.parquet, prepares a clean static trial
+with filtered markers, and scales the base model.
 
 Usage::
 
@@ -17,6 +17,7 @@ import polars as pl
 
 from rat_vml.analysis.pipeline import scale_model_for_subject
 from rat_vml.analysis.static_trial import prepare_static_trial_for_scaling
+from rat_vml.analysis.filtering import prepare_static_trial_for_trc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ def main():
     parser.add_argument("--session", required=True, help="Session name (e.g. baseline, week24)")
     parser.add_argument("--model", required=True, help="Base model path")
     parser.add_argument("--output-dir", "-o", default="data/results", help="Output directory")
+    parser.add_argument("--cutoff", type=float, default=15.0, help="Filter cutoff frequency (Hz)")
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -86,18 +88,24 @@ def main():
     # Load anthropometrics from sessions.parquet
     params = load_session_params(data_dir, args.subject, args.session)
 
-    # Load markers and prepare static trial
+    # Load markers and prepare filtered static trial TRC
     markers_df = load_markers(data_dir, args.subject, args.session)
-    trc_path = prepare_static_trial_for_scaling(
+
+    # Filter and prepare static trial
+    static_wide = prepare_static_trial_for_trc(
         markers_df=markers_df,
-        output_dir=output_dir / "static",
-        subject_id=args.subject,
-        session_id=args.session,
+        cutoff_hz=args.cutoff,
     )
 
-    if trc_path is None:
+    if static_wide is None:
         logger.error("Could not prepare static trial for scaling")
         return
+
+    # Write TRC file
+    from osimpy.io.trc import df_to_trc
+    trc_path = output_dir / f"{args.subject}_{args.session}_static.trc"
+    df_to_trc(static_wide, trc_path, frame_rate=200.0)
+    logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model
     scaled_path = scale_model_for_subject(
