@@ -18,7 +18,7 @@ import polars as pl
 from rat_vml.analysis.pipeline import scale_model_for_subject
 from rat_vml.analysis.static_trial import (
     find_static_trial,
-    find_clean_frame,
+    find_clean_frame_range,
     REQUIRED_MARKERS,
 )
 from rat_vml.analysis.filtering import filter_markers, markers_to_wide_trc
@@ -89,14 +89,21 @@ def main():
         logger.error("No static trial found")
         return
 
-    # Find clean frame (reuses static_trial.py)
-    clean_frame = find_clean_frame(static_df)
-    if clean_frame is None:
-        logger.error("No clean frame in static trial")
+    # Find clean frame range (reuses static_trial.py)
+    frame_range = find_clean_frame_range(static_df)
+    if frame_range is None:
+        logger.error("No clean frame range in static trial")
         return
 
-    # Filter to clean frame, then filter markers
-    frame_df = static_df.filter(pl.col("frame") == clean_frame)
+    start_frame, end_frame = frame_range
+    logger.info(f"Using frame range {start_frame}-{end_frame} for scaling")
+
+    # Filter to clean frame range
+    frame_df = static_df.filter(
+        (pl.col("frame") >= start_frame) & (pl.col("frame") <= end_frame)
+    )
+
+    # Filter markers
     filtered = filter_markers(frame_df, cutoff_hz=args.cutoff)
 
     # Convert to wide TRC format
@@ -105,7 +112,14 @@ def main():
     # Write TRC file
     from osimpy.io.trc import df_to_trc
     trc_path = output_dir / f"{args.subject}_{args.session}_static.trc"
-    df_to_trc(wide, trc_path, frame_rate=200.0)
+    # Get frame rate from data
+    time_vals = filtered.select(
+        pl.col("time").filter(pl.col("frame") == filtered["frame"].min())
+    )["time"].to_list()
+    frame_rate = 1.0 / (time_vals[1] - time_vals[0]) if len(time_vals) > 1 else 200.0
+    logger.info(f"Frame rate: {frame_rate} Hz")
+
+    df_to_trc(wide, trc_path, frame_rate=frame_rate)
     logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model
