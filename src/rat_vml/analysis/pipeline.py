@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 try:
     from osimpy.tools import IKSettings, IDSettings
     from osimpy.moco.inverse import MocoInverseSettings
-    from osimpy import sto_to_df
+    from osimpy.io.sto import sto_to_df
     _HAS_OPENSIM = True
 except ImportError:
     _HAS_OPENSIM = False
