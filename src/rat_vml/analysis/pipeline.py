@@ -191,11 +191,10 @@ def scale_model_for_subject(
     base_model: Path,
     subject_name: str,
     mass: float,
-    femur_length: float,
-    tibia_length: float,
+    r_femur_length: float,
+    r_tibia_length: float,
     output_dir: Path,
-    side: str = "right",
-    foot_length: float = 0.0,
+    r_foot_length: float = 0.0,
     l_femur_length: float | None = None,
     l_tibia_length: float | None = None,
     l_foot_length: float | None = None,
@@ -210,12 +209,12 @@ def scale_model_for_subject(
 
     params = RatScalingParameters(
         Mass=mass,
-        RFemurLength=femur_length,
-        RTibiaLength=tibia_length,
-        LFemurLength=l_femur_length if l_femur_length is not None else femur_length,
-        LTibiaLength=l_tibia_length if l_tibia_length is not None else tibia_length,
-        RFootLength=foot_length,
-        LFootLength=l_foot_length if l_foot_length is not None else foot_length,
+        RFemurLength=r_femur_length,
+        RTibiaLength=r_tibia_length,
+        LFemurLength=l_femur_length if l_femur_length is not None else r_femur_length,
+        LTibiaLength=l_tibia_length if l_tibia_length is not None else r_tibia_length,
+        RFootLength=r_foot_length,
+        LFootLength=l_foot_length if l_foot_length is not None else r_foot_length,
     )
 
     scale_opensim_model(
