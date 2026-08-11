@@ -1616,7 +1616,7 @@ wheels = [
 [[package]]
 name = "osimpy"
 version = "0.1.0"
-source = { git = "https://github.com/hudsonburke/osimpy.git#1d87d808fd5bbefb884c0e87c424a61ff4b99276" }
+source = { git = "https://github.com/hudsonburke/osimpy.git#676a14886d93e8428533e20edd185e6d38e91340" }
 dependencies = [
     { name = "numpy" },
     { name = "opensim" },
@@ -2228,7 +2228,7 @@ provides-extras = ["dev"]
 [[package]]
 name = "rathindlimb"
 version = "0.1.0"
-source = { git = "https://github.com/hudsonburke/rat-hindlimb-model.git#73251d3deb3de3724272b097da06a3b0298a1ffa" }
+source = { git = "https://github.com/hudsonburke/rat-hindlimb-model.git#de91d57813fbb5e7229d1ae8284439b8c438c8e8" }
 dependencies = [
     { name = "numpy" },
     { name = "open3d" },
