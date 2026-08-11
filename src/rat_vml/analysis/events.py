@@ -443,14 +443,25 @@ def find_valid_walking_trials(
             logger.debug(f"  {trial_name}: {reason}")
             continue
 
-        # Check required markers
+        # Check required markers (only between first and last event)
         trial_markers = markers_df.filter(pl.col("trial_name") == trial_name)
-        present_markers = set(trial_markers["marker_name"].unique().to_list())
-        missing = set(required_markers) - present_markers
+        trial_events = events_df.filter(pl.col("trial_name") == trial_name)
 
-        if missing:
-            logger.debug(f"  {trial_name}: missing markers {missing}")
-            continue
+        if not trial_events.is_empty():
+            first_event_time = trial_events["time"].min()
+            last_event_time = trial_events["time"].max()
+
+            # Filter markers to the event window
+            event_window_markers = trial_markers.filter(
+                (pl.col("time") >= first_event_time) &
+                (pl.col("time") <= last_event_time)
+            )
+            present_markers = set(event_window_markers["marker_name"].unique().to_list())
+            missing = set(required_markers) - present_markers
+
+            if missing:
+                logger.debug(f"  {trial_name}: missing markers {missing}")
+                continue
 
         valid_trials.append(trial_name)
 
