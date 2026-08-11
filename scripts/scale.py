@@ -98,7 +98,6 @@ def main():
     start_frame, end_frame = frame_range
     logger.info(f"Using frame range {start_frame}-{end_frame} for scaling")
 
-    # Filter to clean frame range
     frame_df = static_df.filter(
         (pl.col("frame") >= start_frame) & (pl.col("frame") <= end_frame)
     )

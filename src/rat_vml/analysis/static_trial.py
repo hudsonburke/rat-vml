@@ -54,8 +54,48 @@ def find_static_trial(markers_df: pl.DataFrame) -> pl.DataFrame | None:
     return None
 
 
+def find_clean_frame_range(markers_df: pl.DataFrame) -> tuple[int, int] | None:
+    """Find a contiguous range of frames where all required markers are present.
+
+    Returns the (start_frame, end_frame) of the longest contiguous range,
+    or None if no clean frames found.
+    """
+    required_df = markers_df.filter(pl.col("marker_name").is_in(REQUIRED_MARKERS))
+
+    frame_counts = required_df.group_by("frame").agg(
+        pl.col("marker_name").n_unique().alias("n_markers")
+    )
+
+    complete = frame_counts.filter(pl.col("n_markers") >= len(REQUIRED_MARKERS))
+    complete_frames = sorted(complete["frame"].to_list())
+
+    if not complete_frames:
+        logger.warning("No frame with all required markers")
+        return None
+
+    best_start = complete_frames[0]
+    best_end = complete_frames[0]
+    current_start = complete_frames[0]
+    current_end = complete_frames[0]
+
+    for i in range(1, len(complete_frames)):
+        if complete_frames[i] == current_end + 1:
+            current_end = complete_frames[i]
+        else:
+            if current_end - current_start > best_end - best_start:
+                best_start, best_end = current_start, current_end
+            current_start = current_end = complete_frames[i]
+
+    if current_end - current_start > best_end - best_start:
+        best_start, best_end = current_start, current_end
+
+    n_frames = best_end - best_start + 1
+    logger.info(f"Found clean frame range: {best_start}-{best_end} ({n_frames} frames)")
+    return best_start, best_end
+
+
 def find_clean_frame(markers_df: pl.DataFrame) -> int | None:
-    """Find a frame where all required markers are present.
+    """Find a single frame where all required markers are present.
 
     Returns the first such frame, or None.
     """
