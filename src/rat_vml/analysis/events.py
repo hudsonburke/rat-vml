@@ -361,16 +361,6 @@ def validate_walking_events(
     # Sort by time
     events_df = events_df.sort("time")
 
-    # Check exactly 7 events
-    n_events = len(events_df)
-    if n_events != 7:
-        violations.append({
-            "type": "event_count",
-            "expected": 7,
-            "actual": n_events,
-        })
-        return False, f"expected 7 events, got {n_events}", violations
-
     # Extract context/label pairs
     event_sequence = [
         (row["context"], row["label"])
@@ -420,8 +410,9 @@ def find_valid_walking_trials(
     """
     import polars as pl
 
+    from .static_trial import REQUIRED_MARKERS
+
     if required_markers is None:
-        from .static_trial import REQUIRED_MARKERS
         required_markers = REQUIRED_MARKERS
 
     # Get unique trial names
