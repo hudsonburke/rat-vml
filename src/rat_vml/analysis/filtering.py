@@ -231,17 +231,41 @@ def filter_forceplate_wide(
     return wide
 
 
+# Default force plate to side mapping for rat hindlimb lab
+# Plates 2,3 = left side; Plates 4,5 = right side
+DEFAULT_FP_SIDE_MAP = {
+    "Bertec_Force_Plate_2": "left",
+    "Bertec_Force_Plate_3": "left",
+    "Bertec_Force_Plate_4": "right",
+    "Bertec_Force_Plate_5": "right",
+}
+
+
 def zero_outside_gait_cycle(
     fp_df: pl.DataFrame,
     events_df: pl.DataFrame,
+    fp_side_map: dict[str, str] | None = None,
 ) -> pl.DataFrame:
     """Zero force plate data outside the gait cycle window.
 
     Each force plate is zeroed outside the first foot strike to last foot strike
     window for its corresponding side (left/right).
+
+    Parameters
+    ----------
+    fp_df : pl.DataFrame
+        Force plates DataFrame (long format).
+    events_df : pl.DataFrame
+        Events DataFrame with columns: time, context, label.
+    fp_side_map : dict or None
+        Mapping of force plate names to sides ("left"/"right").
+        If None, uses DEFAULT_FP_SIDE_MAP.
     """
     if events_df.is_empty():
         return fp_df
+
+    if fp_side_map is None:
+        fp_side_map = DEFAULT_FP_SIDE_MAP
 
     # Get foot strike times for each side
     left_strikes = events_df.filter(
@@ -257,26 +281,15 @@ def zero_outside_gait_cycle(
     right_start = min(right_strikes) if right_strikes else 0
     right_end = max(right_strikes) if right_strikes else float("inf")
 
-    # Map force plate names to sides
-    fp_names = fp_df["fp_name"].unique().to_list()
-    fp_sides = {}
-    for name in fp_names:
-        name_lower = name.lower()
-        if "left" in name_lower or "1" in name_lower:
-            fp_sides[name] = "left"
-        elif "right" in name_lower or "2" in name_lower:
-            fp_sides[name] = "right"
-        else:
-            fp_sides[name] = "unknown"
-
     def _zero_outside(group_df: pl.DataFrame) -> pl.DataFrame:
         fp_name = group_df["fp_name"][0]
-        side = fp_sides.get(fp_name, "unknown")
+        side = fp_side_map.get(fp_name, "unknown")
         if side == "left":
             start, end = left_start, left_end
         elif side == "right":
             start, end = right_start, right_end
         else:
+            logger.warning(f"Force plate {fp_name} has no side mapping, skipping zeroing")
             return group_df
         return group_df.with_columns(
             pl.when((pl.col("time") < start) | (pl.col("time") > end))
