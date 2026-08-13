@@ -19,7 +19,7 @@ from pathlib import Path
 import polars as pl
 
 from rat_vml.analysis.filtering import filter_markers, markers_to_wide_trc
-from rat_vml.analysis.events import find_valid_walking_trials
+from rat_vml.analysis.parquet_catalog import ParquetCatalog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,10 +49,11 @@ def main():
     events_path = data_dir / args.subject / "events.parquet"
 
     markers_df = pl.read_parquet(markers_path).filter(pl.col("session_id") == args.session)
-    events_df = pl.read_parquet(events_path).filter(pl.col("session_id") == args.session)
 
     # Validate walking trial
-    valid_trials = find_valid_walking_trials(markers_df, events_df)
+    cat = ParquetCatalog(data_dir)
+    valid_df = cat.valid_walking_trials(min_events=7, session=args.session)
+    valid_trials = valid_df.filter(pl.col("subject_id") == args.subject)["trial_name"].to_list()
     if args.trial not in valid_trials:
         logger.error(f"Trial {args.trial} is not a valid walking trial")
         logger.info(f"Valid trials: {valid_trials}")

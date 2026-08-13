@@ -42,13 +42,9 @@ except ImportError:
 
 from .events import (
     GaitEvents,
-    extract_events_from_c3d,
-    extract_events_from_enf,
     validate_walking_trial,
     get_gait_cycle_times,
-    check_marker_gaps,
 )
-from .forces import process_force_plate, zero_outside_gait_cycle, write_external_loads_xml
 from .parquet_io import parquet_to_trc, parquet_to_fp_mot
 from .results_storage import store_ik_result, store_id_result, store_moco_result
 
@@ -124,66 +120,6 @@ MOMENT_NAMES = [
 # =========================================================================
 # Trial filtering
 # =========================================================================
-def filter_walking_trials(
-    session_dir: Path,
-    side: str = "right",
-    min_events: int = 7,
-) -> list[dict]:
-    """Find valid walking trials in a session directory.
-
-    A trial is valid if:
-    1. It has ≥7 gait events on the primary side in the correct order
-    2. It has no marker gaps (all-zero frames)
-    3. It is not a Static trial
-
-    Parameters
-    ----------
-    session_dir : Path
-        Path to session directory (e.g. data/raw/BAA01/Baseline/).
-    side : str
-        Primary analysis side ("left" or "right").
-    min_events : int
-        Minimum events required on the primary side.
-
-    Returns
-    -------
-    list of dicts with keys: 'c3d', 'enf', 'events', 'is_valid', 'reason'
-    """
-    session_dir = Path(session_dir)
-
-    # Find all C3D files, excluding Static trials
-    c3d_files = sorted(session_dir.glob("*.c3d"))
-    c3d_files = [f for f in c3d_files if "static" not in f.name.lower()]
-
-    results = []
-    for c3d in c3d_files:
-        enf = c3d.with_suffix(".Trial.enf")
-
-        # Extract events from C3D or .enf
-        try:
-            events = extract_events_from_c3d(c3d)
-        except Exception:
-            events = extract_events_from_enf(enf, 200.0, 0)
-
-        is_valid, reason = validate_walking_trial(events, side, min_events)
-
-        results.append({
-            "c3d": c3d,
-            "enf": enf,
-            "events": events,
-            "is_valid": is_valid,
-            "reason": reason,
-        })
-
-    valid = [r for r in results if r["is_valid"]]
-    logger.info(
-        f"{session_dir.name}: {len(valid)}/{len(results)} valid trials "
-        f"(filtered: {sum(1 for r in results if not r['is_valid'])})"
-    )
-
-    return results
-
-
 # =========================================================================
 # Scaling
 # =========================================================================
@@ -567,19 +503,9 @@ def run_subject(
                 # Load and spline results
                 if ik_file.exists():
                     ik_df, _ = sto_to_df(str(ik_file))
-
-                    # Try to extract events from .rrd for splining
-                    try:
-                        from .events import extract_events_from_c3d
-                        # Events are in the .rrd as TextLog entries
-                        # For now, use the full IK data without stance/swing split
-                        ik_cols = [c for c in ik_df.columns if c != "time"]
-                        ik_data = ik_df.select(ik_cols).to_numpy()
-                        trial_result.ik_splined = ik_data
-                    except Exception:
-                        ik_cols = [c for c in ik_df.columns if c != "time"]
-                        ik_data = ik_df.select(ik_cols).to_numpy()
-                        trial_result.ik_splined = ik_data
+                    ik_cols = [c for c in ik_df.columns if c != "time"]
+                    ik_data = ik_df.select(ik_cols).to_numpy()
+                    trial_result.ik_splined = ik_data
 
                 trial_result.success = True
                 result.trial_results.append(trial_result)

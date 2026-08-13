@@ -5,7 +5,6 @@ description = "Analysis of Volumetric Muscle Loss Injury and Treatments in the R
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "duckdb>=1.0.0",
   "huggingface-hub",
   "matplotlib",
   "movedb-core",
