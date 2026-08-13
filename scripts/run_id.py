@@ -81,11 +81,18 @@ def main():
     logger.info(f"Wrote MOT: {mot_path}")
 
     # Write external loads XML
+    # Determine body from force plate side
+    side_col = "side" if "side" in filtered.columns else None
     ext_forces = []
     for fp in fp_names:
+        if side_col:
+            side = filtered.filter(pl.col("fp_name") == fp)[side_col][0]
+            body = "foot_r" if side.lower() == "right" else "foot_l"
+        else:
+            body = "foot_r"
         ext_forces.append(OpenSimExternalForce(
             name=fp,
-            applied_to_body="calcn_r",
+            applied_to_body=body,
             force_expressed_in_body="ground",
             point_expressed_in_body="ground",
             data_source_name=mot_path.name,
