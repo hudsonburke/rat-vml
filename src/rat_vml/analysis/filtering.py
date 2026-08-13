@@ -237,33 +237,61 @@ def zero_outside_gait_cycle(
 ) -> pl.DataFrame:
     """Zero force plate data outside the gait cycle window.
 
-    All force plates are zeroed outside the first foot strike to last foot strike
-    window across all sides.
-
-    Parameters
-    ----------
-    fp_df : pl.DataFrame
-        Force plates DataFrame (long format).
-    events_df : pl.DataFrame
-        Events DataFrame with columns: time, context, label.
+    If force plates have a 'side' column, zeros each plate outside its
+    side's gait cycle. Otherwise, zeros all plates outside the overall window.
     """
     if events_df.is_empty():
         return fp_df
 
-    # Get all foot strike times
-    strikes = events_df.filter(pl.col("label") == "Foot Strike")["time"].to_list()
+    # Get foot strike times for each side
+    left_strikes = events_df.filter(
+        (pl.col("context") == "Left") & (pl.col("label") == "Foot Strike")
+    )["time"].to_list()
 
-    if not strikes:
-        return fp_df
+    right_strikes = events_df.filter(
+        (pl.col("context") == "Right") & (pl.col("label") == "Foot Strike")
+    )["time"].to_list()
 
-    gait_start = min(strikes)
-    gait_end = max(strikes)
+    # Check if side column exists
+    has_side = "side" in fp_df.columns
 
-    # Zero all force plates outside gait cycle
-    result = fp_df.with_columns(
-        pl.when((pl.col("time") < gait_start) | (pl.col("time") > gait_end))
-        .then(0.0).otherwise(pl.col("value")).alias("value")
-    )
+    if has_side:
+        # Per-side zeroing
+        def _zero_per_side(group_df: pl.DataFrame) -> pl.DataFrame:
+            side = group_df["side"][0].lower() if group_df["side"][0] else "unknown"
+            if side == "left" and left_strikes:
+                start, end = min(left_strikes), max(left_strikes)
+            elif side == "right" and right_strikes:
+                start, end = min(right_strikes), max(right_strikes)
+            else:
+                # No side info or no strikes — use overall window
+                all_strikes = left_strikes + right_strikes
+                if not all_strikes:
+                    return group_df
+                start, end = min(all_strikes), max(all_strikes)
 
-    logger.info(f"Zeroed force plates outside gait cycle ({gait_start:.2f}-{gait_end:.2f}s)")
+            return group_df.with_columns(
+                pl.when((pl.col("time") < start) | (pl.col("time") > end))
+                .then(0.0).otherwise(pl.col("value")).alias("value")
+            )
+
+        result = fp_df.group_by("fp_name", "trial_name", maintain_order=True).map_groups(
+            lambda g: _zero_per_side(g)
+        )
+        logger.info("Zeroed force plates per side outside gait cycle")
+    else:
+        # Overall zeroing (no side info)
+        all_strikes = left_strikes + right_strikes
+        if not all_strikes:
+            return fp_df
+
+        gait_start = min(all_strikes)
+        gait_end = max(all_strikes)
+
+        result = fp_df.with_columns(
+            pl.when((pl.col("time") < gait_start) | (pl.col("time") > gait_end))
+            .then(0.0).otherwise(pl.col("value")).alias("value")
+        )
+        logger.info(f"Zeroed force plates outside gait cycle ({gait_start:.2f}-{gait_end:.2f}s)")
+
     return result
