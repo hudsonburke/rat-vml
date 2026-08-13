@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
-"""Run ID for a subject/trial using osimpy directly.
+"""Run ID for a subject/trial.
 
-Reads force plates from Parquet, writes MOT + ext loads using osimpy io, runs ID using osimpy IDSettings.
+Pipeline:
+1. Filter force plates (58-62 Hz notch + 50 Hz lowpass)
+2. Zero outside gait cycle
+3. Export to MOT + ext loads XML
+4. Run ID using scaled model + IK results
 
 Usage::
 
-    python scripts/run_id.py --data-dir data/processed --subject BAA01 --session Baseline --trial Walk02 --model data/processed/BAA01/scaled_model.osim --ik-file data/processed/BAA01/ik_Baseline_Walk02.mot
+    python scripts/run_id.py --data-dir data/processed --subject BAA01 --session baseline --trial Walk02 --model data/results/BAA01_scaled.osim --ik-file data/results/BAA01/ik_baseline_Walk02.mot
 """
 
 import argparse
 import logging
 from pathlib import Path
+
+import polars as pl
+
+from rat_vml.analysis.filtering import (
+    filter_forceplate,
+    zero_outside_gait_cycle,
+)
+from rat_vml.analysis.parquet_io import _read_forceplates, _fp_to_wide_df, _detect_rate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,34 +36,82 @@ def main():
     parser.add_argument("--trial", required=True, help="Trial name")
     parser.add_argument("--model", required=True, help="Scaled model path")
     parser.add_argument("--ik-file", required=True, help="IK result file")
-    parser.add_argument("--output-dir", "-o", default="data/processed", help="Output directory")
-    # ID-specific params (from params.yaml via DVC)
-    parser.add_argument("--lowpass-cutoff-frequency", type=float, default=6.0)
+    parser.add_argument("--output-dir", "-o", default="data/results", help="Output directory")
+    parser.add_argument("--lowpass-cutoff", type=float, default=6.0, help="ID lowpass cutoff")
     args = parser.parse_args()
 
-    from osimpy.tools import IDSettings
-    from rat_vml.analysis.parquet_io import parquet_to_fp_mot
-
+    data_dir = Path(args.data_dir)
     output_dir = Path(args.output_dir) / args.subject
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Extract force plate data from Parquet
-    _, ext_loads_path = parquet_to_fp_mot(
-        args.data_dir, args.subject, args.session, args.trial, output_dir,
-        output_prefix=f"{args.session}_{args.trial}"
+    # Load force plates and events
+    fp_df = _read_forceplates(data_dir, args.subject, args.session, args.trial)
+    events_path = data_dir / args.subject / "events.parquet"
+    events_df = pl.read_parquet(events_path).filter(
+        (pl.col("session_id") == args.session) & (pl.col("trial_name") == args.trial)
     )
 
-    # Run ID using osimpy
+    if fp_df.is_empty():
+        logger.error(f"No force plate data for {args.subject}/{args.session}/{args.trial}")
+        return
+
+    # Filter force plates (58-62 Hz notch + 50 Hz lowpass)
+    filtered = filter_forceplate(fp_df)
+
+    # Zero outside gait cycle
+    filtered = zero_outside_gait_cycle(filtered, events_df)
+
+    # Convert to wide format and write MOT
+    from osimpy.io.sto import df_to_sto, STOMetadata
+    from osimpy.io.forces import export_external_loads, OpenSimExternalForce
+
+    wide_df, fp_names = _fp_to_wide_df(filtered)
+    rate = _detect_rate(filtered)
+
+    output_prefix = f"{args.session}_{args.trial}"
+    mot_path = output_dir / f"{output_prefix}_forces.mot"
+
+    metadata = STOMetadata(
+        name=mot_path.name,
+        nRows=len(wide_df),
+        nColumns=len(wide_df.columns),
+        inDegrees="yes",
+    )
+    df_to_sto(mot_path, wide_df, metadata)
+    logger.info(f"Wrote MOT: {mot_path}")
+
+    # Write external loads XML
+    ext_forces = []
+    for fp in fp_names:
+        ext_forces.append(OpenSimExternalForce(
+            name=fp,
+            applied_to_body="calcn_r",
+            force_expressed_in_body="ground",
+            point_expressed_in_body="ground",
+            data_source_name=mot_path.name,
+        ))
+
+    ext_loads_path = output_dir / f"{output_prefix}_ext_loads.xml"
+    export_external_loads(str(ext_loads_path), ext_forces, datafile_name=mot_path.name)
+    logger.info(f"Wrote ext loads: {ext_loads_path}")
+
+    # Run ID
+    from osimpy.tools import IDSettings
+
     id_path = output_dir / f"id_{args.session}_{args.trial}.sto"
     settings = IDSettings(
         model_path=Path(args.model),
         coordinates_path=Path(args.ik_file),
         output_forces_file=str(id_path),
         external_loads_path=ext_loads_path,
-        lowpass_cutoff_frequency=args.lowpass_cutoff_frequency,
+        lowpass_cutoff_frequency=args.lowpass_cutoff,
     )
     result = settings.run()
-    logger.info(f"ID complete: {id_path}")
+
+    if result.success:
+        logger.info(f"ID complete: {id_path}")
+    else:
+        logger.error(f"ID failed: {result.errors}")
 
 
 if __name__ == "__main__":
