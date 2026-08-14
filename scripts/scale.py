@@ -162,6 +162,12 @@ def main():
         marker_set_path=Path(args.marker_set),
         subject_name=f"{args.subject}_{args.session}",
         mass=params["mass"],
+        r_femur_length=params["r_femur_length"],
+        r_tibia_length=params["r_tibia_length"],
+        r_foot_length=params["r_foot_length"],
+        l_femur_length=params.get("l_femur_length"),
+        l_tibia_length=params.get("l_tibia_length"),
+        l_foot_length=params.get("l_foot_length"),
         marker_path=trc_path,
         output_dir=output_dir,
     )
