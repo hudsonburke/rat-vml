@@ -1,6 +1,6 @@
 """Scaling utilities for rat hindlimb model.
 
-Wraps osimpy's ScaleSettings with rat-specific parameter handling.
+Thin wrapper around rathindlimb.scale.scale_opensim_model.
 """
 
 from __future__ import annotations
@@ -17,63 +17,65 @@ def scale_model_for_subject(
     marker_set_path: Path,
     subject_name: str,
     mass: float,
-    marker_path: Path,
-    output_dir: Path,
+    r_femur_length: float,
+    r_tibia_length: float,
+    r_foot_length: float,
+    l_femur_length: float | None = None,
+    l_tibia_length: float | None = None,
+    l_foot_length: float | None = None,
+    marker_path: Path | None = None,
+    output_dir: Path | None = None,
 ) -> Path:
     """Scale base model to subject anthropometrics.
 
-    Parameters
-    ----------
-    base_model : Path
-        Path to unscaled model (.osim).
-    setup_path : Path
-        Path to scale setup XML template.
-    marker_set_path : Path
-        Path to marker set XML file.
-    subject_name : str
-        Subject identifier for output file naming.
-    mass : float
-        Subject mass (kg).
-    marker_path : Path
-        Path to TRC file with marker positions.
-    output_dir : Path
-        Output directory for scaled model.
-
-    Returns
-    -------
-    Path
-        Path to scaled model.
+    Uses rathindlimb.scale.scale_opensim_model which runs OpenSim Scale Tool
+    and applies Hicks regression for masses, COM, and inertias.
     """
-    if not base_model.exists():
-        raise FileNotFoundError(f"Base model not found: {base_model}")
-    if not setup_path.exists():
-        raise FileNotFoundError(f"Scale setup not found: {setup_path}")
-    if not marker_set_path.exists():
-        raise FileNotFoundError(f"Marker set not found: {marker_set_path}")
-    if not marker_path.exists():
-        raise FileNotFoundError(f"Marker file not found: {marker_path}")
+    from rathindlimb.scale import scale_opensim_model, RatScalingParameters
 
-    output_path = (output_dir / f"{subject_name}_scaled.osim").resolve()
+    if output_dir is None:
+        output_dir = base_model.parent / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    from osimpy.tools import ScaleSettings
+    # Use right side values as defaults for left
+    if l_femur_length is None:
+        l_femur_length = r_femur_length
+    if l_tibia_length is None:
+        l_tibia_length = r_tibia_length
+    if l_foot_length is None:
+        l_foot_length = r_foot_length
 
-    settings = ScaleSettings(
-        name=f"{subject_name}_scale",
-        setup_path=setup_path,
-        model_path=base_model,
-        results_directory=output_dir.resolve(),
-        marker_set_path=marker_set_path,
-        marker_path=marker_path,
-        output_model_file=str(output_path),
-        subject_mass=mass,
-        preserve_mass_distribution=False,
+    parameters: RatScalingParameters = {
+        "Mass": mass,
+        "RFemurLength": r_femur_length,
+        "RTibiaLength": r_tibia_length,
+        "RFootLength": r_foot_length,
+        "LFemurLength": l_femur_length,
+        "LTibiaLength": l_tibia_length,
+        "LFootLength": l_foot_length,
+    }
+
+    # Use the rathindlimb module's paths if not provided
+    from rathindlimb.scale import (
+        unscaled_model_path as default_model,
+        generic_setup_path as default_setup,
+        marker_set_path as default_markers,
     )
 
-    result = settings.run()
+    if base_model == Path("models/rat_hindlimb_bilateral.osim"):
+        base_model = default_model
+    if setup_path == Path("models/xml/rat_hindlimb_bilateral_scale_setup.xml"):
+        setup_path = default_setup
+    if marker_set_path == Path("models/xml/rat_hindlimb_bilateral_markers.xml"):
+        marker_set_path = default_markers
 
-    if result.success:
-        logger.info(f"Scaled model: {output_path}")
-        return output_path
-    else:
-        logger.error(f"Scaling failed: {result.errors}")
-        raise RuntimeError(f"Scaling failed: {result.errors}")
+    scale_opensim_model(
+        name=subject_name,
+        trc_file_name=str(marker_path) if marker_path else "",
+        parameters=parameters,
+        output_dir=str(output_dir),
+    )
+
+    scaled_path = output_dir / f"{subject_name}_scaled.osim"
+    logger.info(f"Scaled model: {scaled_path}")
+    return scaled_path
