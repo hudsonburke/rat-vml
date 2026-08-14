@@ -47,7 +47,7 @@ def filter_markers(
 
     time_vals = markers_df.filter(
         pl.col("frame") == frames[0]
-    )["time"].to_list()
+    )["time"].unique().sort().to_list()
 
     if len(time_vals) < 2:
         return markers_df
