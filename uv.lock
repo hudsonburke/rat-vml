@@ -2435,7 +2435,7 @@ provides-extras = ["dev"]
 [[package]]
 name = "rathindlimb"
 version = "0.1.0"
-source = { git = "https://github.com/hudsonburke/rat-hindlimb-model.git#aa97bd45ef8227f8529c7f001e0e1e5b7a9adc33" }
+source = { git = "https://github.com/hudsonburke/rat-hindlimb-model.git#f2a9b1c50afa873648c50a567ea305f045c3a273" }
 dependencies = [
     { name = "ezc3d" },
     { name = "numpy" },

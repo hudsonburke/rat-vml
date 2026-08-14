@@ -55,20 +55,6 @@ def scale_model_for_subject(
         "LFootLength": l_foot_length,
     }
 
-    # Use the rathindlimb module's paths if not provided
-    from rathindlimb.scale import (
-        unscaled_model_path as default_model,
-        generic_setup_path as default_setup,
-        marker_set_path as default_markers,
-    )
-
-    if base_model == Path("models/rat_hindlimb_bilateral.osim"):
-        base_model = default_model
-    if setup_path == Path("models/xml/rat_hindlimb_bilateral_scale_setup.xml"):
-        setup_path = default_setup
-    if marker_set_path == Path("models/xml/rat_hindlimb_bilateral_markers.xml"):
-        marker_set_path = default_markers
-
     scale_opensim_model(
         name=subject_name,
         trc_file_name=str(marker_path) if marker_path else "",
