@@ -109,7 +109,7 @@ def main():
     # Get frame rate from data
     time_vals = filtered.select(
         pl.col("time").filter(pl.col("frame") == filtered["frame"].min())
-    )["time"].to_list()
+    )["time"].unique().sort().to_list()
     frame_rate = 1.0 / (time_vals[1] - time_vals[0]) if len(time_vals) > 1 else 200.0
     logger.info(f"Frame rate: {frame_rate} Hz")
 
