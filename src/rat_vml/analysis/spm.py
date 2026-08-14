@@ -462,3 +462,279 @@ def prepare_stance_swing_data(
     event_times = np.array([fs1, fo1, fs2])
     stance, swing = spline_to_stance_swing(data, times, event_times, n_points)
     return np.vstack([stance, swing])
+
+
+# ---------------------------------------------------------------------------
+# Results aggregation for plotting
+# ---------------------------------------------------------------------------
+
+@dataclass
+class GroupResult:
+    """Aggregated results for a treatment group."""
+    group_name: str
+    ik_mean: np.ndarray | None = None   # (202, n_coords)
+    ik_std: np.ndarray | None = None
+    id_mean: np.ndarray | None = None   # (202, n_moments)
+    id_std: np.ndarray | None = None
+    activation_mean: np.ndarray | None = None  # (202, n_muscles)
+    activation_std: np.ndarray | None = None
+    n_subjects: int = 0
+    n_trials: int = 0
+
+
+def load_ik_results(
+    data_dir: Path,
+    subject_id: str,
+    session: str,
+    trial: str,
+) -> np.ndarray | None:
+    """Load IK results from Parquet file.
+
+    Returns array of shape (n_frames, n_coords) or None.
+    """
+    import polars as pl
+
+    path = data_dir / subject_id / f"ik_{session}_{trial}.parquet"
+    if not path.exists():
+        return None
+
+    df = pl.read_parquet(path)
+    # Assuming columns: time, coord1, coord2, ...
+    numeric_cols = [c for c in df.columns if c not in ("time", "frame")]
+    return df.select(numeric_cols).to_numpy()
+
+
+def load_id_results(
+    data_dir: Path,
+    subject_id: str,
+    session: str,
+    trial: str,
+) -> np.ndarray | None:
+    """Load ID results from Parquet file.
+
+    Returns array of shape (n_frames, n_moments) or None.
+    """
+    import polars as pl
+
+    path = data_dir / subject_id / f"id_{session}_{trial}.parquet"
+    if not path.exists():
+        return None
+
+    df = pl.read_parquet(path)
+    numeric_cols = [c for c in df.columns if c not in ("time", "frame")]
+    return df.select(numeric_cols).to_numpy()
+
+
+def load_activation_results(
+    data_dir: Path,
+    subject_id: str,
+    session: str,
+    trial: str,
+) -> np.ndarray | None:
+    """Load Moco activation results from Parquet file.
+
+    Returns array of shape (n_frames, n_muscles) or None.
+    """
+    import polars as pl
+
+    path = data_dir / subject_id / f"moco_{session}_{trial}.parquet"
+    if not path.exists():
+        return None
+
+    df = pl.read_parquet(path)
+    numeric_cols = [c for c in df.columns if c not in ("time", "frame")]
+    return df.select(numeric_cols).to_numpy()
+
+
+def aggregate_subject(
+    data_dir: Path,
+    subject_id: str,
+    session: str,
+    trials: list[str],
+    events_df,
+    result_type: str = "ik",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Aggregate results across trials for a single subject.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Root data directory.
+    subject_id : str
+        Subject identifier.
+    session : str
+        Session name.
+    trials : list[str]
+        Trial names to include.
+    events_df : pl.DataFrame
+        Events data for spline timing.
+    result_type : str
+        "ik", "id", or "activation".
+
+    Returns
+    -------
+    mean : np.ndarray
+        Shape (202, n_vars).
+    std : np.ndarray
+        Shape (202, n_vars).
+    """
+    import polars as pl
+
+    load_fn = {
+        "ik": load_ik_results,
+        "id": load_id_results,
+        "activation": load_activation_results,
+    }[result_type]
+
+    all_splined = []
+    for trial in trials:
+        data = load_fn(data_dir, subject_id, session, trial)
+        if data is None:
+            continue
+
+        # Get time array
+        trial_path = data_dir / subject_id / f"{result_type}_{session}_{trial}.parquet"
+        df = pl.read_parquet(trial_path)
+        times = df["time"].to_numpy()
+
+        # Spline to stance+swing
+        splined = prepare_stance_swing_data(
+            data, times, events_df, subject_id, session, trial
+        )
+        all_splined.append(splined)
+
+    if not all_splined:
+        n_vars = data.shape[1] if data is not None else 0
+        return np.zeros((202, n_vars)), np.zeros((202, n_vars))
+
+    stacked = np.stack(all_splined)  # (n_trials, 202, n_vars)
+    return np.mean(stacked, axis=0), np.std(stacked, axis=0)
+
+
+def aggregate_group(
+    data_dir: Path,
+    subject_ids: list[str],
+    session: str,
+    trials: list[str],
+    events_df,
+    group_name: str,
+    result_type: str = "ik",
+) -> GroupResult:
+    """Aggregate results across subjects for a treatment group.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Root data directory.
+    subject_ids : list[str]
+        Subjects in this group.
+    session : str
+        Session name.
+    trials : list[str]
+        Trial names to include.
+    events_df : pl.DataFrame
+        Events data.
+    group_name : str
+        Group name for labeling.
+    result_type : str
+        "ik", "id", or "activation".
+
+    Returns
+    -------
+    GroupResult
+        Aggregated mean/std across subjects.
+    """
+    all_subject_means = []
+    total_trials = 0
+
+    for subject_id in subject_ids:
+        mean, std = aggregate_subject(
+            data_dir, subject_id, session, trials, events_df, result_type
+        )
+        if mean.size > 0:
+            all_subject_means.append(mean)
+            total_trials += len(trials)
+
+    if not all_subject_means:
+        return GroupResult(group_name=group_name, n_subjects=0, n_trials=0)
+
+    stacked = np.stack(all_subject_means)  # (n_subjects, 202, n_vars)
+    group_mean = np.mean(stacked, axis=0)
+    group_std = np.std(stacked, axis=0)
+
+    result = GroupResult(
+        group_name=group_name,
+        n_subjects=len(all_subject_means),
+        n_trials=total_trials,
+    )
+
+    if result_type == "ik":
+        result.ik_mean = group_mean
+        result.ik_std = group_std
+    elif result_type == "id":
+        result.id_mean = group_mean
+        result.id_std = group_std
+    elif result_type == "activation":
+        result.activation_mean = group_mean
+        result.activation_std = group_std
+
+    return result
+
+
+def aggregate_all_groups(
+    data_dir: Path,
+    group_subjects: dict[str, list[str]],
+    session: str,
+    trials: list[str],
+    events_df,
+    result_types: list[str] | None = None,
+) -> dict[str, GroupResult]:
+    """Aggregate results for all treatment groups.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Root data directory.
+    group_subjects : dict
+        Mapping of group name -> list of subject IDs.
+    session : str
+        Session name.
+    trials : list[str]
+        Trial names to include.
+    events_df : pl.DataFrame
+        Events data.
+    result_types : list[str] or None
+        Which result types to aggregate (default: ["ik", "id"]).
+
+    Returns
+    -------
+    dict
+        Mapping of group name -> GroupResult.
+    """
+    if result_types is None:
+        result_types = ["ik", "id"]
+
+    results = {}
+    for group_name, subject_ids in group_subjects.items():
+        result = GroupResult(group_name=group_name, n_subjects=len(subject_ids))
+
+        for rt in result_types:
+            agg = aggregate_group(
+                data_dir, subject_ids, session, trials,
+                events_df, group_name, result_type=rt
+            )
+            if rt == "ik":
+                result.ik_mean = agg.ik_mean
+                result.ik_std = agg.ik_std
+            elif rt == "id":
+                result.id_mean = agg.id_mean
+                result.id_std = agg.id_std
+            elif rt == "activation":
+                result.activation_mean = agg.activation_mean
+                result.activation_std = agg.activation_std
+
+            result.n_trials = max(result.n_trials, agg.n_trials)
+
+        results[group_name] = result
+
+    return results
