@@ -186,6 +186,8 @@ def plot_activation(
     title: str = "Muscle Activations",
     group_name: str | None = None,
     spm_result: SPMResult | None = None,
+    stance_swing: bool = True,
+    n_points: int = 101,
 ) -> Path:
     """Plot muscle activation profiles (0 to 1) for individual muscles.
 
@@ -193,6 +195,7 @@ def plot_activation(
     ----------
     activation_data : np.ndarray
         Shape (n_timepoints, n_muscles) with values in [0, 1].
+        If stance_swing=True, first n_points are stance, rest are swing.
     muscle_names : list[str]
         Names for each muscle column.
     time : np.ndarray
@@ -205,6 +208,10 @@ def plot_activation(
         Group name for filename.
     spm_result : SPMResult or None
         SPM result for highlighting significant regions.
+    stance_swing : bool
+        If True, show stance/swing boundary and label x-axis accordingly.
+    n_points : int
+        Points per phase (default 101).
 
     Returns
     -------
@@ -249,7 +256,10 @@ def plot_activation(
         ax.tick_params(labelsize=7)
 
         if row == n_rows - 1:
-            ax.set_xlabel("Gait %", fontsize=8)
+            if stance_swing:
+                ax.set_xlabel("Stance % | Swing %", fontsize=8)
+            else:
+                ax.set_xlabel("Gait %", fontsize=8)
         if col == 0:
             ax.set_ylabel("Activation", fontsize=8)
 
@@ -279,6 +289,8 @@ def plot_activation_comparison(
     output_path: Path,
     group_name: str,
     spm_results: dict[str, SPMResult] | None = None,
+    stance_swing: bool = True,
+    n_points: int = 101,
 ) -> Path:
     """Plot activation comparison between control and treatment groups.
 
@@ -348,7 +360,10 @@ def plot_activation_comparison(
         ax.tick_params(labelsize=7)
 
         if row == n_rows - 1:
-            ax.set_xlabel("Gait %", fontsize=8)
+            if stance_swing:
+                ax.set_xlabel("Stance % | Swing %", fontsize=8)
+            else:
+                ax.set_xlabel("Gait %", fontsize=8)
         if col == 0:
             ax.set_ylabel("Activation", fontsize=8)
 
@@ -362,3 +377,88 @@ def plot_activation_comparison(
     plt.close(fig)
     logger.info(f"Saved {path}")
     return path
+
+
+# ---------------------------------------------------------------------------
+# Stance/swing splining
+# ---------------------------------------------------------------------------
+
+def spline_to_stance_swing(
+    data: np.ndarray,
+    times: np.ndarray,
+    event_times: np.ndarray,
+    n_points: int = 101,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Spline data to separate stance and swing phases.
+
+    Each phase is splined to n_points (default 101).
+    """
+    from scipy.interpolate import CubicSpline
+
+    if len(event_times) < 3:
+        return data, data
+
+    fs1, fo1, fs2 = event_times[0], event_times[1], event_times[2]
+    stance_pct = np.linspace(0, 100, n_points)
+    swing_pct = np.linspace(0, 100, n_points)
+
+    stance_mask = (times >= fs1) and (times <= fo1)
+    swing_mask = (times >= fo1) and (times <= fs2)
+
+    stance_times = times[stance_mask]
+    swing_times = times[swing_mask]
+
+    if len(stance_times) < 2 or len(swing_times) < 2:
+        return data, data
+
+    stance_norm = (stance_times - fs1) / (fo1 - fs1) * 100
+    swing_norm = (swing_times - fo1) / (fs2 - fo1) * 100
+
+    if data.ndim == 1:
+        cs_stance = CubicSpline(stance_norm, data[stance_mask])
+        cs_swing = CubicSpline(swing_norm, data[swing_mask])
+        return cs_stance(stance_pct), cs_swing(swing_pct)
+    else:
+        stance_out = np.zeros((n_points, data.shape[1]))
+        swing_out = np.zeros((n_points, data.shape[1]))
+        for col in range(data.shape[1]):
+            cs_stance = CubicSpline(stance_norm, data[stance_mask, col])
+            cs_swing = CubicSpline(swing_norm, data[swing_mask, col])
+            stance_out[:, col] = cs_stance(stance_pct)
+            swing_out[:, col] = cs_swing(swing_pct)
+        return stance_out, swing_out
+
+
+def prepare_stance_swing_data(
+    data: np.ndarray,
+    times: np.ndarray,
+    events_df,
+    subject_id: str,
+    session: str,
+    trial: str,
+    n_points: int = 101,
+) -> np.ndarray:
+    """Prepare data splined to stance+swing phases for a single trial.
+
+    Returns array of shape (2*n_points, n_cols) with stance then swing.
+    """
+    trial_events = events_df.filter(
+        (pl.col("subject_id") == subject_id)
+        and (pl.col("session_id") == session)
+        and (pl.col("trial_name") == trial)
+    )
+
+    strikes = trial_events.filter(pl.col("label") == "Foot Strike")
+    offs = trial_events.filter(pl.col("label") == "Foot Off")
+
+    if len(strikes) < 2 or len(offs) < 1:
+        return data
+
+    fs1 = float(strikes["time"].min())
+    fo1 = float(offs["time"].min())
+    fs2_series = strikes.filter(pl.col("time") > fo1)["time"]
+    fs2 = float(fs2_series.min()) if len(fs2_series) > 0 else float(strikes["time"].max())
+
+    event_times = np.array([fs1, fo1, fs2])
+    stance, swing = spline_to_stance_swing(data, times, event_times, n_points)
+    return np.vstack([stance, swing])
