@@ -29,6 +29,8 @@ try:
 except ImportError:
     spm1d = None
 
+from .spm import spm_ttest_1d, SPMResult
+
 
 # Colour palette for treatment groups
 GROUP_COLORS = {
@@ -72,6 +74,7 @@ def plot_kinematics(
     side: str = "r",
     n_points: int = 101,
     negated: list[str] | None = None,
+    spm_results: dict[str, SPMResult] | None = None,
 ) -> Path:
     """Generate kinematic comparison plot for one treatment group.
 
@@ -130,6 +133,9 @@ def plot_kinematics(
             ax.set_title(title)
             continue
 
+        # Get SPM result for this coordinate
+        spm_result = spm_results.get(coord) if spm_results else None
+
         # Apply negation for knee flexion (MATLAB convention)
         sign = -1.0 if coord in negated else 1.0
 
@@ -151,6 +157,11 @@ def plot_kinematics(
 
         # Stance/swing boundary
         ax.axvline(x=n_points, color="gray", linestyle=":", linewidth=0.8)
+
+        # SPM highlighting
+        if spm_result is not None and spm_result.significant:
+            for start, end in spm_result.clusters:
+                ax.axvspan(start, end, color="red", alpha=0.2, zorder=0)
         ax.set_title(title, fontsize=9)
         ax.set_xlabel("Gait %", fontsize=8)
         ax.set_ylabel("Angle (°)", fontsize=8)
