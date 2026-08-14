@@ -117,7 +117,7 @@ def main():
     logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model
-    from rat_vml.analysis.pipeline import scale_model_for_subject
+    from rat_vml.analysis.scaling import scale_model_for_subject
     scaled_path = scale_model_for_subject(
         base_model=Path(args.model),
         subject_name=f"{args.subject}_{args.session}",
