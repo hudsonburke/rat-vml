@@ -172,3 +172,193 @@ def find_gait_cycles(
         return 0.0, 0.0
 
     return float(strikes["time"].min()), float(strikes["time"].max())
+
+
+# ---------------------------------------------------------------------------
+# Moco activation plotting
+# ---------------------------------------------------------------------------
+
+def plot_activation(
+    activation_data: np.ndarray,
+    muscle_names: list[str],
+    time: np.ndarray,
+    output_path: Path,
+    title: str = "Muscle Activations",
+    group_name: str | None = None,
+    spm_result: SPMResult | None = None,
+) -> Path:
+    """Plot muscle activation profiles (0 to 1) for individual muscles.
+
+    Parameters
+    ----------
+    activation_data : np.ndarray
+        Shape (n_timepoints, n_muscles) with values in [0, 1].
+    muscle_names : list[str]
+        Names for each muscle column.
+    time : np.ndarray
+        Time points (gait %, 0-200 for stance+swing).
+    output_path : Path
+        Directory to save figure.
+    title : str
+        Figure title.
+    group_name : str or None
+        Group name for filename.
+    spm_result : SPMResult or None
+        SPM result for highlighting significant regions.
+
+    Returns
+    -------
+    Path
+        Path to saved figure.
+    """
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+    except ImportError:
+        logger.error("matplotlib not installed")
+        return Path()
+
+    sns.set_theme(style="ticks", context="paper", rc={
+        "figure.dpi": 300, "savefig.dpi": 300,
+        "savefig.bbox": "tight", "font.family": "sans-serif",
+    })
+
+    n_muscles = len(muscle_names)
+    n_cols = min(4, n_muscles)
+    n_rows = (n_muscles + n_cols - 1) // n_cols
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), squeeze=False)
+    fig.suptitle(title, fontsize=12)
+
+    for idx, muscle in enumerate(muscle_names):
+        row, col = divmod(idx, n_cols)
+        ax = axes[row, col]
+
+        # Plot activation
+        ax.plot(time, activation_data[:, idx], linewidth=1.5, color="#4C72B0")
+        ax.fill_between(time, 0, activation_data[:, idx], alpha=0.2, color="#4C72B0")
+
+        # SPM highlighting
+        if spm_result is not None and spm_result.significant:
+            for start, end in spm_result.clusters:
+                ax.axvspan(start, end, color="red", alpha=0.2, zorder=0)
+
+        ax.set_title(muscle, fontsize=9)
+        ax.set_ylim(0, 1)
+        ax.set_xlim(time[0], time[-1])
+        ax.tick_params(labelsize=7)
+
+        if row == n_rows - 1:
+            ax.set_xlabel("Gait %", fontsize=8)
+        if col == 0:
+            ax.set_ylabel("Activation", fontsize=8)
+
+    # Hide unused axes
+    for idx in range(n_muscles, n_rows * n_cols):
+        row, col = divmod(idx, n_cols)
+        axes[row, col].set_visible(False)
+
+    plt.tight_layout()
+
+    if group_name:
+        fname = f"{group_name.lower().replace('+', '_')}_activations.png"
+    else:
+        fname = "activations.png"
+    path = output_path / fname
+    fig.savefig(path, dpi=300)
+    plt.close(fig)
+    logger.info(f"Saved {path}")
+    return path
+
+
+def plot_activation_comparison(
+    control_data: np.ndarray,
+    treatment_data: np.ndarray,
+    muscle_names: list[str],
+    time: np.ndarray,
+    output_path: Path,
+    group_name: str,
+    spm_results: dict[str, SPMResult] | None = None,
+) -> Path:
+    """Plot activation comparison between control and treatment groups.
+
+    Parameters
+    ----------
+    control_data : np.ndarray
+        Shape (n_timepoints, n_muscles) for control group.
+    treatment_data : np.ndarray
+        Shape (n_timepoints, n_muscles) for treatment group.
+    muscle_names : list[str]
+        Names for each muscle column.
+    time : np.ndarray
+        Time points (gait %).
+    output_path : Path
+        Directory to save figure.
+    group_name : str
+        Treatment group name.
+    spm_results : dict or None
+        Mapping of muscle name -> SPMResult for highlighting.
+
+    Returns
+    -------
+    Path
+        Path to saved figure.
+    """
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+    except ImportError:
+        logger.error("matplotlib not installed")
+        return Path()
+
+    sns.set_theme(style="ticks", context="paper", rc={
+        "figure.dpi": 300, "savefig.dpi": 300,
+        "savefig.bbox": "tight", "font.family": "sans-serif",
+    })
+
+    n_muscles = len(muscle_names)
+    n_cols = min(4, n_muscles)
+    n_rows = (n_muscles + n_cols - 1) // n_cols
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), squeeze=False)
+    fig.suptitle(f"{group_name} — Muscle Activations", fontsize=12)
+
+    for idx, muscle in enumerate(muscle_names):
+        row, col = divmod(idx, n_cols)
+        ax = axes[row, col]
+
+        # Control (gray dashed)
+        ax.plot(time, control_data[:, idx], linewidth=1.5, color="gray",
+                linestyle="--", alpha=0.6)
+
+        # Treatment (colored)
+        color = GROUP_COLORS.get(group_name, "#4C72B0")
+        ax.plot(time, treatment_data[:, idx], linewidth=1.5, color=color)
+        ax.fill_between(time, 0, treatment_data[:, idx], alpha=0.15, color=color)
+
+        # SPM highlighting
+        spm_res = spm_results.get(muscle) if spm_results else None
+        if spm_res is not None and spm_res.significant:
+            for start, end in spm_res.clusters:
+                ax.axvspan(start, end, color="red", alpha=0.2, zorder=0)
+
+        ax.set_title(muscle, fontsize=9)
+        ax.set_ylim(0, 1)
+        ax.set_xlim(time[0], time[-1])
+        ax.tick_params(labelsize=7)
+
+        if row == n_rows - 1:
+            ax.set_xlabel("Gait %", fontsize=8)
+        if col == 0:
+            ax.set_ylabel("Activation", fontsize=8)
+
+    for idx in range(n_muscles, n_rows * n_cols):
+        row, col = divmod(idx, n_cols)
+        axes[row, col].set_visible(False)
+
+    plt.tight_layout()
+    path = output_path / f"{group_name.lower().replace('+', '_')}_activations.png"
+    fig.savefig(path, dpi=300)
+    plt.close(fig)
+    logger.info(f"Saved {path}")
+    return path
