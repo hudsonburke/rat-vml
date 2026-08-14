@@ -13,15 +13,12 @@ logger = logging.getLogger(__name__)
 
 def scale_model_for_subject(
     base_model: Path,
+    setup_path: Path,
+    marker_set_path: Path,
     subject_name: str,
     mass: float,
-    r_femur_length: float,
-    r_tibia_length: float,
-    r_foot_length: float,
-    l_femur_length: float | None = None,
-    l_tibia_length: float | None = None,
-    l_foot_length: float | None = None,
-    output_dir: Path | None = None,
+    marker_path: Path,
+    output_dir: Path,
 ) -> Path:
     """Scale base model to subject anthropometrics.
 
@@ -29,51 +26,47 @@ def scale_model_for_subject(
     ----------
     base_model : Path
         Path to unscaled model (.osim).
+    setup_path : Path
+        Path to scale setup XML template.
+    marker_set_path : Path
+        Path to marker set XML file.
     subject_name : str
         Subject identifier for output file naming.
     mass : float
         Subject mass (kg).
-    r_femur_length : float
-        Right femur length (mm).
-    r_tibia_length : float
-        Right tibia length (mm).
-    r_foot_length : float
-        Right foot length (mm).
-    l_femur_length : float or None
-        Left femur length (mm). If None, uses right side.
-    l_tibia_length : float or None
-        Left tibia length (mm). If None, uses right side.
-    l_foot_length : float or None
-        Left foot length (mm). If None, uses right side.
-    output_dir : Path or None
-        Output directory. If None, uses parent of base_model.
+    marker_path : Path
+        Path to TRC file with marker positions.
+    output_dir : Path
+        Output directory for scaled model.
 
     Returns
     -------
     Path
         Path to scaled model.
     """
-    # Use right side values as defaults for left
-    if l_femur_length is None:
-        l_femur_length = r_femur_length
-    if l_tibia_length is None:
-        l_tibia_length = r_tibia_length
-    if l_foot_length is None:
-        l_foot_length = r_foot_length
+    if not base_model.exists():
+        raise FileNotFoundError(f"Base model not found: {base_model}")
+    if not setup_path.exists():
+        raise FileNotFoundError(f"Scale setup not found: {setup_path}")
+    if not marker_set_path.exists():
+        raise FileNotFoundError(f"Marker set not found: {marker_set_path}")
+    if not marker_path.exists():
+        raise FileNotFoundError(f"Marker file not found: {marker_path}")
 
-    if output_dir is None:
-        output_dir = base_model.parent
-
-    output_path = output_dir / f"{subject_name}_scaled.osim"
+    output_path = (output_dir / f"{subject_name}_scaled.osim").resolve()
 
     from osimpy.tools import ScaleSettings
 
     settings = ScaleSettings(
+        name=f"{subject_name}_scale",
+        setup_path=setup_path,
         model_path=base_model,
+        results_directory=output_dir.resolve(),
+        marker_set_path=marker_set_path,
+        marker_path=marker_path,
         output_model_file=str(output_path),
-        mass=mass,
-        # These are scale factors, not absolute lengths
-        # The actual scaling uses the model's base lengths
+        subject_mass=mass,
+        preserve_mass_distribution=False,
     )
 
     result = settings.run()

@@ -6,7 +6,13 @@ filters markers, and scales the base model.
 
 Usage::
 
-    python scripts/scale.py --data-dir data/processed --subject BAA01 --session baseline --model models/rat_hindlimb_bilateral.osim
+    python scripts/scale.py \\
+        --data-dir data/processed \\
+        --subject BAA01 \\
+        --session baseline
+
+Model files (--model, --setup, --marker-set) default to bundled files from
+the rathindlimb package.
 """
 
 import argparse
@@ -61,7 +67,23 @@ def main():
     parser.add_argument("--data-dir", required=True, help="Processed Parquet data directory")
     parser.add_argument("--subject", required=True, help="Subject ID")
     parser.add_argument("--session", required=True, help="Session name (e.g. baseline, week24)")
-    parser.add_argument("--model", required=True, help="Base model path")
+    import rathindlimb
+
+    parser.add_argument(
+        "--model",
+        default=rathindlimb.bilateral_model(),
+        help="Base model path (.osim)",
+    )
+    parser.add_argument(
+        "--setup",
+        default=rathindlimb.bilateral_scale_setup(),
+        help="Scale setup XML template",
+    )
+    parser.add_argument(
+        "--marker-set",
+        default=rathindlimb.bilateral_markers(),
+        help="Marker set XML file",
+    )
     parser.add_argument("--output-dir", "-o", default="data/results", help="Output directory")
     parser.add_argument("--cutoff", type=float, default=15.0, help="Filter cutoff frequency (Hz)")
     args = parser.parse_args()
@@ -104,7 +126,7 @@ def main():
     wide = markers_to_wide_trc(filtered)
 
     # Write TRC file
-    from osimpy.io.trc import df_to_trc
+    from osimpy.io.trc import df_to_trc, TRCMetadata
     trc_path = output_dir / f"{args.subject}_{args.session}_static.trc"
     # Get frame rate from data
     time_vals = filtered.select(
@@ -113,21 +135,34 @@ def main():
     frame_rate = 1.0 / (time_vals[1] - time_vals[0]) if len(time_vals) > 1 else 200.0
     logger.info(f"Frame rate: {frame_rate} Hz")
 
-    df_to_trc(wide, trc_path, frame_rate=frame_rate)
+    # Get marker names from wide dataframe (exclude frame and time columns)
+    marker_cols = [col for col in wide.columns if col not in ("frame", "time")]
+
+    # Extract unique marker names from columns like 'x_TAIL', 'y_TAIL', 'z_TAIL'
+    marker_names = sorted(set(col.split("_", 1)[1] for col in marker_cols))
+
+    metadata = TRCMetadata(
+        name=f"{args.subject}_{args.session}_static",
+        DataRate=frame_rate,
+        CameraRate=frame_rate,
+        NumFrames=len(wide),
+        NumMarkers=len(marker_names),
+        Units="mm",
+        MarkerNames=marker_names,
+    )
+
+    df_to_trc(trc_path, wide, metadata=metadata)
     logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model
     from rat_vml.analysis.scaling import scale_model_for_subject
     scaled_path = scale_model_for_subject(
         base_model=Path(args.model),
+        setup_path=Path(args.setup),
+        marker_set_path=Path(args.marker_set),
         subject_name=f"{args.subject}_{args.session}",
         mass=params["mass"],
-        r_femur_length=params["r_femur_length"],
-        r_tibia_length=params["r_tibia_length"],
-        r_foot_length=params["r_foot_length"],
-        l_femur_length=params["l_femur_length"],
-        l_tibia_length=params["l_tibia_length"],
-        l_foot_length=params["l_foot_length"],
+        marker_path=trc_path,
         output_dir=output_dir,
     )
 
