@@ -22,7 +22,7 @@ from rat_vml.analysis.filtering import (
     filter_forceplate,
     zero_outside_gait_cycle,
 )
-from rat_vml.analysis.parquet_io import _read_forceplates, _fp_to_wide_df, _detect_rate
+from rat_vml.analysis.parquet_io import _fp_to_wide_df, _detect_rate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,12 +44,16 @@ def main():
     output_dir = Path(args.output_dir) / args.subject
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Use movedb catalog
+    from movedb import MoveDB
+    db = MoveDB(data_dir)
+
     # Load force plates and events
-    fp_df = _read_forceplates(data_dir, args.subject, args.session, args.trial)
-    events_path = data_dir / args.subject / "events.parquet"
-    events_df = pl.read_parquet(events_path).filter(
-        (pl.col("session_id") == args.session) & (pl.col("trial_name") == args.trial)
-    )
+    fp_df = db.get_forceplates(args.subject, session=args.session)
+    fp_df = fp_df.filter(pl.col("trial_name") == args.trial)
+
+    events_df = db.get_events(args.subject, session=args.session)
+    events_df = events_df.filter(pl.col("trial_name") == args.trial)
 
     if fp_df.is_empty():
         logger.error(f"No force plate data for {args.subject}/{args.session}/{args.trial}")

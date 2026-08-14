@@ -1,7 +1,7 @@
 """Parquet -> OpenSim file format extraction.
 
-Reads marker and force plate data from Parquet files (written by
-movedb-core) and writes TRC and MOT files for OpenSim IK/ID.
+Reads marker and force plate data via movedb-core's catalog and
+writes TRC and MOT files for OpenSim IK/ID.
 
 Uses osimpy's io module for file writing:
 - osimpy.io.trc.df_to_trc + TRCMetadata
@@ -23,30 +23,6 @@ _VICON_TO_OPENSIM = np.array([
     [0, 0, 1],
     [0, -1, 0],
 ], dtype=np.float64)
-
-
-def _read_markers(data_dir: Path, subject_id: str, session: str, trial_name: str) -> pl.DataFrame:
-    path = data_dir / subject_id / "markers.parquet"
-    if not path.exists():
-        return pl.DataFrame()
-    df = pl.read_parquet(path)
-    return df.filter(
-        (pl.col("subject_id") == subject_id)
-        & (pl.col("session_id") == session)
-        & (pl.col("trial_name") == trial_name)
-    )
-
-
-def _read_forceplates(data_dir: Path, subject_id: str, session: str, trial_name: str) -> pl.DataFrame:
-    path = data_dir / subject_id / "forceplates.parquet"
-    if not path.exists():
-        return pl.DataFrame()
-    df = pl.read_parquet(path)
-    return df.filter(
-        (pl.col("subject_id") == subject_id)
-        & (pl.col("session_id") == session)
-        & (pl.col("trial_name") == trial_name)
-    )
 
 
 def _detect_rate(df: pl.DataFrame) -> float:
@@ -129,7 +105,11 @@ def parquet_to_trc(
     output_dir: str | Path,
     output_name: str | None = None,
 ) -> Path:
-    """Extract markers from Parquet and write TRC file using osimpy."""
+    """Extract markers from Parquet and write TRC file using osimpy.
+
+    Uses movedb catalog for data access.
+    """
+    from movedb import MoveDB
     from osimpy.io.trc import df_to_trc, TRCMetadata
 
     data_dir = Path(data_dir)
@@ -139,7 +119,11 @@ def parquet_to_trc(
     if output_name is None:
         output_name = f"{trial_name}.trc"
 
-    markers_df = _read_markers(data_dir, subject_id, session, trial_name)
+    # Use movedb catalog
+    db = MoveDB(data_dir)
+    markers_df = db.get_points(subject_id, session=session)
+    markers_df = markers_df.filter(pl.col("trial_name") == trial_name)
+
     if markers_df.is_empty():
         raise ValueError(f"No marker data for {subject_id}/{session}/{trial_name}")
 
@@ -170,7 +154,11 @@ def parquet_to_fp_mot(
     output_dir: str | Path,
     output_prefix: str | None = None,
 ) -> tuple[Path, Path]:
-    """Extract force plate data from Parquet and write MOT + external loads XML using osimpy."""
+    """Extract force plate data from Parquet and write MOT + external loads XML using osimpy.
+
+    Uses movedb catalog for data access.
+    """
+    from movedb import MoveDB
     from osimpy.io.sto import df_to_sto, STOMetadata
     from osimpy.io.forces import export_external_loads, OpenSimExternalForce
 
@@ -181,7 +169,11 @@ def parquet_to_fp_mot(
     if output_prefix is None:
         output_prefix = trial_name
 
-    fp_df = _read_forceplates(data_dir, subject_id, session, trial_name)
+    # Use movedb catalog
+    db = MoveDB(data_dir)
+    fp_df = db.get_forceplates(subject_id, session=session)
+    fp_df = fp_df.filter(pl.col("trial_name") == trial_name)
+
     if fp_df.is_empty():
         raise ValueError(f"No force plate data for {subject_id}/{session}/{trial_name}")
 

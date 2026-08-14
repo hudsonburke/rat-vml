@@ -19,7 +19,6 @@ from pathlib import Path
 import polars as pl
 
 from rat_vml.analysis.filtering import filter_markers, markers_to_wide_trc
-from rat_vml.analysis.parquet_catalog import ParquetCatalog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,24 +43,24 @@ def main():
     output_dir = Path(args.output_dir) / args.subject
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load markers and events
-    markers_path = data_dir / args.subject / "markers.parquet"
-    events_path = data_dir / args.subject / "events.parquet"
+    # Use movedb catalog
+    from movedb import MoveDB
+    db = MoveDB(data_dir)
 
-    markers_df = pl.read_parquet(markers_path).filter(pl.col("session_id") == args.session)
+    # Load markers and events
+    markers_df = db.get_points(args.subject, session=args.session)
+    markers_df = markers_df.filter(pl.col("trial_name") == args.trial)
 
     # Validate walking trial
-    cat = ParquetCatalog(data_dir)
-    valid_df = cat.valid_walking_trials(min_events=7, session=args.session)
-    valid_trials = valid_df.filter(pl.col("subject_id") == args.subject)["trial_name"].to_list()
-    if args.trial not in valid_trials:
-        logger.error(f"Trial {args.trial} is not a valid walking trial")
-        logger.info(f"Valid trials: {valid_trials}")
+    events_df = db.get_events(args.subject, session=args.session)
+    events_df = events_df.filter(pl.col("trial_name") == args.trial)
+
+    if events_df.is_empty() or len(events_df) < 7:
+        logger.error(f"Trial {args.trial} is not a valid walking trial (need 7+ events)")
         return
 
     # Filter markers
-    trial_markers = markers_df.filter(pl.col("trial_name") == args.trial)
-    filtered = filter_markers(trial_markers, cutoff_hz=args.cutoff)
+    filtered = filter_markers(markers_df, cutoff_hz=args.cutoff)
 
     # Convert to wide TRC format
     wide = markers_to_wide_trc(filtered)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Scale model for a subject.
 
-Reads anthropometrics from sessions.parquet, finds clean static trial,
+Reads anthropometrics from parameters.parquet, finds clean static trial,
 filters markers, and scales the base model.
 
 Usage::
@@ -15,11 +15,9 @@ from pathlib import Path
 
 import polars as pl
 
-from rat_vml.analysis.pipeline import scale_model_for_subject
 from rat_vml.analysis.static_trial import (
     find_static_trial,
     find_clean_frame_range,
-    REQUIRED_MARKERS,
 )
 from rat_vml.analysis.filtering import filter_markers, markers_to_wide_trc
 
@@ -28,23 +26,19 @@ logger = logging.getLogger(__name__)
 
 
 def load_session_params(data_dir: Path, subject_id: str, session_id: str) -> dict:
-    """Load anthropometrics from sessions.parquet."""
-    sessions_path = data_dir / subject_id / "sessions.parquet"
-    if not sessions_path.exists():
-        raise FileNotFoundError(
-            f"sessions.parquet not found for {subject_id}. Run convert.py to generate it."
-        )
+    """Load anthropometrics from parameters.parquet via movedb catalog."""
+    from movedb import MoveDB
 
-    df = pl.read_parquet(sessions_path)
-    session_row = df.filter(pl.col("session_id") == session_id)
+    db = MoveDB(data_dir)
+    params_df = db.get_parameters(subject_id, session=session_id)
 
-    if session_row.is_empty():
-        available = df["session_id"].unique().to_list()
+    if params_df.is_empty():
         raise ValueError(
-            f"Session '{session_id}' not found for {subject_id}. Available: {available}"
+            f"No parameters found for {subject_id}/{session_id}. "
+            "Run convert.py to generate them."
         )
 
-    row = session_row.to_dicts()[0]
+    row = params_df.to_dicts()[0]
     params = {
         "mass": row.get("Mass", 0.0),
         "r_femur_length": row.get("RFemurLength", 0.0),
@@ -76,20 +70,21 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load anthropometrics
+    # Load anthropometrics via movedb catalog
     params = load_session_params(data_dir, args.subject, args.session)
 
-    # Load markers
-    markers_path = data_dir / args.subject / "markers.parquet"
-    markers_df = pl.read_parquet(markers_path).filter(pl.col("session_id") == args.session)
+    # Load markers via movedb catalog
+    from movedb import MoveDB
+    db = MoveDB(data_dir)
+    markers_df = db.get_points(args.subject, session=args.session)
 
-    # Find static trial (reuses static_trial.py)
+    # Find static trial
     static_df = find_static_trial(markers_df)
     if static_df is None:
         logger.error("No static trial found")
         return
 
-    # Find clean frame range (reuses static_trial.py)
+    # Find clean frame range
     frame_range = find_clean_frame_range(static_df)
     if frame_range is None:
         logger.error("No clean frame range in static trial")
@@ -122,6 +117,7 @@ def main():
     logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model
+    from rat_vml.analysis.pipeline import scale_model_for_subject
     scaled_path = scale_model_for_subject(
         base_model=Path(args.model),
         subject_name=f"{args.subject}_{args.session}",

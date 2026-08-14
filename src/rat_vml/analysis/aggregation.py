@@ -3,7 +3,6 @@
 Provides parameterized functions for:
 - Aggregating IK/ID/Moco results by group and session/timepoint
 - Comparing groups at a given timepoint
-- Comparing timepoints within a group
 - SPM t-tests for statistical comparison
 
 Usage::
@@ -12,7 +11,6 @@ Usage::
         load_results,
         aggregate_by_group,
         compare_groups,
-        compare_timepoints,
         spm_ttest,
     )
 
@@ -85,7 +83,7 @@ def load_results(
     session: str | None = None,
     subject_ids: list[str] | None = None,
 ) -> pl.DataFrame:
-    """Load results from Parquet files using glob.
+    """Load results from Parquet files using movedb catalog.
 
     Parameters
     ----------
@@ -104,32 +102,29 @@ def load_results(
         Long-format DataFrame with columns:
         time, coord, value, subject_id, session_id, trial_name
     """
+    from movedb import MoveDB
+
     data_dir = Path(data_dir)
-    paths = sorted(data_dir.glob(f"*/{result_type}_results.parquet"))
+    db = MoveDB(data_dir)
 
-    if not paths:
+    # Use DuckDB to read all result files at once
+    glob_pattern = str(data_dir / "*/" / f"{result_type}_results.parquet")
+    try:
+        df = db.query(f"SELECT * FROM '{glob_pattern}'")
+    except Exception:
         return pl.DataFrame()
 
-    dfs = []
-    for path in paths:
-        p = Path(path)
-        subject_id = p.parent.name
-
-        if subject_ids and subject_id not in subject_ids:
-            continue
-
-        df = pl.read_parquet(path)
-
-        if session:
-            df = df.filter(pl.col("session_id") == session)
-
-        if not df.is_empty():
-            dfs.append(df)
-
-    if not dfs:
+    if df.is_empty():
         return pl.DataFrame()
 
-    return pl.concat(dfs)
+    # Apply filters
+    if session:
+        df = df.filter(pl.col("session_id") == session)
+
+    if subject_ids:
+        df = df.filter(pl.col("subject_id").is_in(subject_ids))
+
+    return df
 
 
 def aggregate_by_group(
