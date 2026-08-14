@@ -5,106 +5,138 @@ Analysis of Volumetric Muscle Loss Injury and Treatments in the Rodent Lateral G
 This repository contains the analysis pipeline and manuscript for a study comparing
 biomechanical outcomes across seven treatment groups after VML injury in rats.
 
-## Repository structure
+## Repository Structure
 
 ```
 scripts/
-  ingest.py            # One-time C3D → .rrd conversion (workstation only)
-  catalog.py           # MoveDB catalog queries (subjects, trials, events)
-  run_analysis.py      # Main analysis pipeline (scale → IK → ID → plots)
-src/rat_vml/analysis/  # Analysis module (events, forces, io, pipeline, plots, queries)
-data/
-  rrd/                 # Pre-built .rrd catalog (downloaded from HuggingFace)
-  subjects.csv         # Subject metadata (group, mass, limb lengths) — generated
-  results/             # IK/ID results per subject (generated)
-  figures/             # Output figures (generated)
-images/                # Manuscript figures (committed for Quarto render)
-_extensions/           # AGU journal Quarto extension
+  scale.py             # Scale model to subject anthropometrics
+  run_ik.py            # Run Inverse Kinematics
+  run_id.py            # Run Inverse Dynamics
+  run_moco.py          # Run MocoInverse muscle analysis
+  aggregate.py         # Group aggregation and comparison
+  compare.py           # Statistical comparisons between groups
+  plot_helpers.py      # Plotting utilities
+src/rat_vml/analysis/
+  scaling.py           # Model scaling wrapper
+  filtering.py         # Marker and force plate filtering (Butterworth, notch)
+  events.py            # Gait event validation
+  static_trial.py      # Static trial selection for scaling
+  parquet_io.py        # Parquet → TRC/MOT export
+  results_storage.py   # Write IK/ID/Moco outputs to Parquet
+  aggregation.py       # Group aggregation and SPM t-tests
+  plots.py             # Manuscript-quality figures
+  subject_groups.py    # Subject-to-treatment-group mapping
+notebooks/
+  explore.py           # Marimo notebook for data exploration
 ```
 
 ## Quickstart
 
-```shell
-git clone --recurse-submodules https://github.com/hudsonburke/rat-vml.git
+```bash
+git clone https://github.com/hudsonburke/rat-vml.git
 cd rat-vml
 
 # Install dependencies
 uv sync
 
-# Download pre-built .rrd catalog from HuggingFace
-uv run python scripts/ingest.py pull
+# Download data from HuggingFace
+python -c "
+from huggingface_hub import snapshot_download
+snapshot_download('hudsonburke/rat-hindlimb-mocap', repo_type='dataset',
+                  local_dir='data', allow_patterns=['processed/**/*.parquet'])
+"
 
-# Build subjects.csv from catalog (tags subjects with treatment groups)
-uv run python scripts/catalog.py subjects data/rrd/ -o data/subjects.csv
+# Scale model for a subject
+python scripts/scale.py \
+  --data-dir data/processed \
+  --subject BAA01 \
+  --session baseline \
+  --model ~/rat-hindlimb-model/models/osim/rat_hindlimb_bilateral.osim
 
-# Run the full analysis pipeline
-uv run python scripts/run_analysis.py --data-dir data --model ../rat-hindlimb-model/models/osim/rat_hindlimb_bilateral.osim
+# Run IK on a valid walking trial
+python scripts/run_ik.py \
+  --data-dir data/processed \
+  --subject BAA01 \
+  --session baseline \
+  --trial Walk02 \
+  --model data/results/BAA01/BAA01_baseline_scaled.osim
 
-# Render the manuscript
-quarto render
+# Run ID
+python scripts/run_id.py \
+  --data-dir data/processed \
+  --subject BAA01 \
+  --session baseline \
+  --trial Walk02 \
+  --model data/results/BAA01/BAA01_baseline_scaled.osim \
+  --ik-file data/results/BAA01/ik_baseline_Walk02.mot
+
+# Explore data interactively
+marimo edit notebooks/explore.py
 ```
 
-## C3D Ingestion (one-time, workstation only)
+## Data Pipeline
 
-The `.rrd` catalog files are pre-built and stored in the HuggingFace dataset.
-To rebuild them from raw C3D data (requires x86_64 machine with ezc3d):
+```
+C3D files (rat-hindlimb-mocap)
+  → movedb ingestion → Parquet files
+  → rat-vml reads via movedb.catalog.MoveDB
+  → Filter → TRC/MOT → Scale → IK → ID → Results
+```
 
-```shell
-# Install workstation-only deps
-uv sync --extra ingest
+### Data Access
 
-# Convert C3D to .rrd
-uv run python scripts/ingest.py convert --c3d-dir /path/to/sourcedata -o data/rrd/
+```python
+from movedb import MoveDB
 
-# Push updated .rrd files to HuggingFace
-uv run python scripts/ingest.py push --rrd-dir data/rrd/
+db = MoveDB(Path("data/processed"))
+
+# Load markers, force plates, events
+markers = db.get_points("BAA01", session="baseline")
+forceplates = db.get_forceplates("BAA01", session="baseline")
+events = db.get_events("BAA01", session="baseline")
+
+# Get session parameters (mass, bone lengths)
+params = db.get_parameters("BAA01", session="baseline")
+
+# SQL queries across all subjects
+df = db.query("SELECT subject_id, session_id, mass FROM parameters")
+
+# List available data
+subjects = db.subjects()
+sessions = db.sessions("BAA01")
+trials = db.trials("BAA01", session="baseline")
 ```
 
 ## Dependencies
 
-- **OpenSim 4.6+** (PyPI wheel, Python 3.12–3.13)
-- **osimpy** — Pythonic OpenSim tool wrappers (git dependency)
-- **tsl-optimization** — tendon slack length optimization (git dependency)
-- **rathindlimb** — rat model scaling code (git dependency)
-- **spm1d** — Statistical Parametric Mapping for 1D data (group comparisons)
+- **movedb-core** — Data ingestion and catalog (git dependency)
+- **osimpy** — OpenSim tool wrappers (git dependency)
+- **rathindlimb** — Rat model scaling (git dependency)
+- **spm1d** — Statistical Parametric Mapping
+- **marimo** — Interactive notebooks (optional)
 
 See `pyproject.toml` for the full list.
 
-## Pipeline
+## Interactive Exploration
 
-```
-.rdd catalog ← DuckDB query → find valid walking trials (7 events, no gaps)
-       ↓
-For selected trials: extract markers/forces from .rrd → write TRC/MOT
-       ↓
-Scale → IK → ID → spline to stance+swing → group aggregation → figures
+Launch the marimo notebook for interactive data exploration:
+
+```bash
+marimo edit notebooks/explore.py
 ```
 
-The `.rrd` files are the single source of truth. No C3D reading after ingestion.
+This provides:
+- Browse subjects, sessions, and trials
+- Plot marker trajectories and force plate data
+- Inspect gait events
+- Validate walking trial selection
+- View session parameters (mass, bone lengths)
 
-## CI Pipeline
-
-The GitHub Actions workflow (`pipeline.yml`) runs on push to main.
-
-### Required secrets
-
-| Secret | Purpose | How to set |
-|--------|---------|------------|
-| `HF_TOKEN` | HuggingFace read token for downloading .rrd files | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) → New token → Add as repo secret |
-
-### What runs on push
-
-1. **validate** — installs deps, validates subject group mapping and module imports
-2. **catalog** — downloads `.rrd` files from HuggingFace, builds `subjects.csv`, queries for valid trials
-3. **render** — renders the Quarto manuscript (non-blocking)
-
-### What runs on manual dispatch
-
-4. **analysis** — full pipeline: scale → IK → ID → figures (requires the model from rat-hindlimb-model)
-
-Go to **Actions → Analysis Pipeline → Run workflow** to trigger the full analysis manually.
-
-## Paper
+## Manuscript
 
 The manuscript is formatted for submission to AGU journals using the
 [Quarto AGU extension](https://github.com/quarto-journals/agu).
+
+```bash
+quarto render
+```
