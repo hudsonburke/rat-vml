@@ -84,12 +84,12 @@ def main():
         default=rathindlimb.bilateral_markers(),
         help="Marker set XML file",
     )
-    parser.add_argument("--output-dir", "-o", default="data/results", help="Output directory")
+    parser.add_argument("--output-dir", "-o", default="data/results", help="Output base directory (results go to {output-dir}/{subject}/{session}/)")
     parser.add_argument("--cutoff", type=float, default=15.0, help="Filter cutoff frequency (Hz)")
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
-    output_dir = Path(args.output_dir)
+    output_dir = Path(args.output_dir) / args.subject / args.session
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load anthropometrics via movedb catalog
@@ -119,14 +119,26 @@ def main():
         (pl.col("frame") >= start_frame) & (pl.col("frame") <= end_frame)
     )
 
-    # Filter markers
+    # Filter to required markers only
+    from rat_vml.defaults import REQUIRED_MARKERS
+    frame_df = frame_df.filter(pl.col("marker_name").is_in(REQUIRED_MARKERS))
+
+    # Filter markers with lowpass filter
     filtered = filter_markers(frame_df, cutoff_hz=args.cutoff)
+
+    # For static trial, only use frames where all markers have valid data
+    frames_with_all_data = filtered.group_by("frame").agg(
+        pl.col("x").is_not_nan().all().alias("all_valid")
+    ).filter(pl.col("all_valid"))["frame"]
+    filtered = filtered.filter(pl.col("frame").is_in(frames_with_all_data))
+    logger.info(f"Using {len(frames_with_all_data)} frames with complete marker data")
 
     # Convert to wide TRC format
     wide = markers_to_wide_trc(filtered)
 
     # Write TRC file
     from osimpy.io.trc import df_to_trc, TRCMetadata
+    from rat_vml.defaults import VICON_TO_OPENSIM
     trc_path = output_dir / f"{args.subject}_{args.session}_static.trc"
     # Get frame rate from data
     time_vals = filtered.select(
@@ -137,9 +149,8 @@ def main():
 
     # Get marker names from wide dataframe (exclude frame and time columns)
     marker_cols = [col for col in wide.columns if col not in ("frame", "time")]
-
-    # Extract unique marker names from columns like 'x_TAIL', 'y_TAIL', 'z_TAIL'
-    marker_names = sorted(set(col.split("_", 1)[1] for col in marker_cols))
+    # Columns are now in MARKER_x format, extract unique marker names
+    marker_names = sorted(set(col.rsplit("_", 1)[0] for col in marker_cols))
 
     metadata = TRCMetadata(
         name=f"{args.subject}_{args.session}_static",
@@ -151,7 +162,8 @@ def main():
         MarkerNames=marker_names,
     )
 
-    df_to_trc(trc_path, wide, metadata=metadata)
+    # Apply Vicon -> OpenSim rotation when writing TRC
+    df_to_trc(trc_path, wide, metadata=metadata, rotation=VICON_TO_OPENSIM)
     logger.info(f"Wrote static trial TRC: {trc_path}")
 
     # Scale the model

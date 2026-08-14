@@ -1,6 +1,188 @@
 # DVC pipeline parameters for rat-vml analysis
 # Mirrors osimpy settings where applicable
 
+rotation_matrix: [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
+
+required_markers:
+  - "TAIL"
+  - "SPL6"
+  - "LASI"
+  - "RASI"
+  - "LHIP"
+  - "LKNE"
+  - "LANK"
+  - "LTOE"
+  - "RHIP"
+  - "RKNE"
+  - "RANK"
+  - "RTOE"
+
+scaling_parameters:
+  - "Mass"
+  - "Length"
+  - "RFemurLength"
+  - "RTibiaLength"
+  - "RFootLength"
+  - "LFemurLength"
+  - "LTibiaLength"
+  - "LFootLength"
+
+event_sequences:
+  - name: "left_stance_swing"
+    events:
+      - context: "Left"
+        label: "Foot Strike"
+      - context: "Right"
+        label: "Foot Off"
+      - context: "Right"
+        label: "Foot Strike"
+      - context: "Left"
+        label: "Foot Off"
+      - context: "Left"
+        label: "Foot Strike"
+      - context: "Right"
+        label: "Foot Off"
+      - context: "Right"
+        label: "Foot Strike"
+  - name: "right_stance_swing"
+    events:
+      - context: "Right"
+        label: "Foot Strike"
+      - context: "Left"
+        label: "Foot Off"
+      - context: "Left"
+        label: "Foot Strike"
+      - context: "Right"
+        label: "Foot Off"
+      - context: "Right"
+        label: "Foot Strike"
+      - context: "Left"
+        label: "Foot Off"
+      - context: "Left"
+        label: "Foot Strike"
+
+subject_sets:
+  no_repair_subjects: &no_repair_subjects
+    - "LGS05"
+    - "LGS06"
+    - "LGS07"
+    - "LGS08"
+    - "LGS09"
+    - "LGS10"
+    - "LGS11"
+    - "LGS12"
+    - "LGS13"
+    - "LGS14"
+    - "LGS15"
+    - "LGS16"
+    - "E08"
+    - "E12"
+    - "E13"
+    - "E14"
+    - "E15"
+    - "E16"
+    - "E17"
+    - "E18"
+    - "E19"
+    - "E20"
+    - "E21"
+    - "E26"
+    - "T05"
+    - "T06"
+    - "T07"
+    - "T08"
+  temr_subjects: &temr_subjects
+    - "T01"
+    - "T02"
+    - "T03"
+    - "T04"
+    - "T09"
+    - "T10"
+    - "T11"
+    - "T12"
+    - "G14_E23"
+    - "E09"
+    - "E10"
+    - "A04"
+    - "A05"
+    - "A06"
+    - "A07"
+    - "A08"
+  hh_subjects: &hh_subjects
+    - "G01"
+    - "G02"
+    - "G03"
+    - "G04"
+    - "G05"
+    - "G06"
+    - "G07"
+    - "G08"
+    - "LGHS01"
+    - "LGHS02"
+    - "LGHS03"
+    - "LGHS04"
+    - "G13"
+    - "G14"
+    - "G15"
+    - "G16"
+    - "G17"
+    - "G18"
+  temr_hh_subjects: &temr_hh_subjects
+    - "H01"
+    - "H02"
+    - "H03"
+    - "H04"
+    - "H05"
+    - "H06"
+    - "H07"
+    - "H08"
+    - "G16_E24"
+    - "E02"
+    - "E06"
+    - "E11"
+    - "A09"
+    - "A10"
+    - "A11"
+    - "A12"
+  hs_subjects: &hs_subjects
+    - "S01"
+    - "S03"
+    - "S04"
+    - "S05"
+    - "S06"
+    - "S07"
+    - "S08"
+    - "S09"
+    - "S10"
+    - "S11"
+    - "S12"
+    - "S13"
+    - "S14"
+    - "S15"
+    - "S16"
+    - "S17"
+  temr_kg_subjects: &temr_kg_subjects
+    - "K01"
+    - "K02"
+    - "K03"
+    - "K04"
+    - "K05"
+    - "K06"
+    - "K07"
+    - "K08"
+    - "G13_E22"
+    - "E01"
+    - "E03"
+    - "E04"
+    - "E05"
+    - "A01"
+    - "A02"
+    - "A03"
+  old_subjects: &old_subjects
+    - "Old01"
+    - "Old02"
+    - "Old03"
+
 # Subject definitions (populated from subjects.csv or Parquet metadata)
 subjects: {}
 
@@ -11,26 +193,15 @@ trials: {}
 ik:
   marker_weight: 1.0
   max_iterations: 200
-  constraint_weight: null      # null = use template default
-  accuracy: null               # null = use template default
+  constraint_weight: null # null = use template default
+  accuracy: null # null = use template default
   report_marker_locations: null # null = use template default
-  task_set_path: null          # null = no task set override
+  task_set_path: null # null = no task set override
 
 # ID parameters (mirrors osimpy.tools.IDSettings)
 id:
-  lowpass_cutoff_frequency: 6.0
-  external_loads_path: null    # set per-trial from Parquet extraction
+  lowpass_cutoff_frequency: 15.0
+  external_loads_path: null # set per-trial from Parquet extraction
+
 
 # MocoInverse parameters (mirrors osimpy.moco.inverse.MocoInverseSettings)
-moco:
-  mesh_interval: 0.02
-  replace_muscles_with_dgf: true
-  ignore_tendon_compliance: true
-  ignore_passive_fiber_forces: true
-  reserve_optimal_force: 1.0
-  generate_report: true
-  bilateral: true
-
-# Scaling parameters
-scaling:
-  muscle_scale_method: hicks

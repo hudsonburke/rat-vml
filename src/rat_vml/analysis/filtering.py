@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_CUTOFF_HZ = 15.0
 DEFAULT_ORDER = 4
 
+import numpy as np
+import polars as pl
+from scipy.signal import butter, filtfilt
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_CUTOFF_HZ = 15.0
+DEFAULT_ORDER = 4
+
 
 def butterworth_filter(
     data: np.ndarray,
@@ -34,12 +43,34 @@ def filter_markers(
     markers_df: pl.DataFrame,
     cutoff_hz: float = DEFAULT_CUTOFF_HZ,
     order: int = DEFAULT_ORDER,
+    time_range: tuple[float, float] | None = None,
 ) -> pl.DataFrame:
     """Filter marker positions with Butterworth lowpass.
 
     Works on long-format markers (frame, time, marker_name, x, y, z).
     Filters each marker's x, y, z jointly.
+
+    Parameters
+    ----------
+    markers_df : pl.DataFrame
+        Long-format marker data.
+    cutoff_hz : float
+        Lowpass cutoff frequency in Hz.
+    order : int
+        Butterworth filter order.
+    time_range : tuple[float, float] or None
+        If provided, trim data to (start_time, end_time) before filtering.
     """
+    # Trim to time range if specified
+    if time_range is not None:
+        start_time, end_time = time_range
+        markers_df = markers_df.filter(
+            (pl.col("time") >= start_time) & (pl.col("time") <= end_time)
+        )
+        if markers_df.is_empty():
+            logger.warning(f"No data in time range {start_time}-{end_time}")
+            return markers_df
+
     # Calculate frame rate from time spacing
     frames = markers_df["frame"].unique().sort()
     if len(frames) < 2:
@@ -54,31 +85,104 @@ def filter_markers(
 
     frame_rate = 1.0 / (time_vals[1] - time_vals[0])
 
-    # Group by marker and apply filter to each
-    def _filter_group(group_df: pl.DataFrame) -> pl.DataFrame:
-        xyz = group_df.select(["x", "y", "z"]).to_numpy()
-        filtered = butterworth_filter(xyz, cutoff_hz, frame_rate, order)
-        return group_df.with_columns([
-            pl.Series("x", filtered[:, 0]),
-            pl.Series("y", filtered[:, 1]),
-            pl.Series("z", filtered[:, 2]),
-        ])
-
-    result = markers_df.group_by("marker_name", maintain_order=True).map_groups(
-        lambda g: _filter_group(g)
+    # Pivot to wide format for vectorized filtering
+    # Columns will be: frame, time, x_MARKERA, y_MARKERA, z_MARKERA, x_MARKERB, ...
+    wide = markers_df.pivot(
+        on="marker_name",
+        index=["frame", "time"],
+        values=["x", "y", "z"],
     )
 
+    # Get marker columns (excluding frame and time)
+    marker_cols = [c for c in wide.columns if c not in ("frame", "time")]
+    
+    # Extract numpy array for vectorized filtering
+    xyz_data = wide.select(marker_cols).to_numpy()
+    valid_mask = ~np.isnan(xyz_data)
+    
+    # Apply filter to each column (vectorized across all markers)
+    filtered_data = np.full_like(xyz_data, np.nan)
+    for col_idx in range(xyz_data.shape[1]):
+        channel = xyz_data[:, col_idx]
+        col_valid = valid_mask[:, col_idx]
+        
+        if col_valid.sum() < 3:
+            continue
+        
+        try:
+            filt_channel = butterworth_filter(channel, cutoff_hz, frame_rate, order)
+            filt_channel[~col_valid] = np.nan
+            filtered_data[:, col_idx] = filt_channel
+        except Exception:
+            filtered_data[:, col_idx] = channel
+    
+    # Convert back to long format
+    filtered_wide = wide.select(["frame", "time"]).hstack(
+        pl.DataFrame(filtered_data, schema=marker_cols)
+    )
+    
+    # Melt back to long format
+    result = filtered_wide.melt(
+        id_vars=["frame", "time"],
+        variable_name="marker_col",
+        value_name="value",
+    )
+    
+    # Parse marker_col (e.g., 'x_RASI') into marker_name and axis
+    result = result.with_columns([
+        pl.col("marker_col").str.split("_").list.first().alias("axis"),
+        pl.col("marker_col").str.split("_").list.slice(1).list.join("_").alias("marker_name"),
+    ]).drop("marker_col")
+    
+    # Pivot axes to columns
+    result = result.pivot(
+        on="axis",
+        index=["frame", "time", "marker_name"],
+        values="value",
+    )
+    
     logger.info(f"Filtered markers at {cutoff_hz} Hz")
     return result
 
 
 def markers_to_wide_trc(markers_df: pl.DataFrame) -> pl.DataFrame:
-    """Convert long-format markers to wide-format TRC layout."""
-    return markers_df.pivot(
+    """Convert long-format markers to wide-format TRC layout.
+
+    Parameters
+    ----------
+    markers_df : pl.DataFrame
+        Long-format marker data with columns: frame, time, marker_name, x, y, z.
+
+    Returns
+    -------
+    pl.DataFrame
+        Wide-format with columns: frame, time, {marker}_x, {marker}_y, {marker}_z
+        sorted alphabetically by marker name.
+    """
+    # Pivot to wide format
+    wide = markers_df.pivot(
         on="marker_name",
         index=["frame", "time"],
         values=["x", "y", "z"],
     )
+
+    # Rename columns from x_MARKER to MARKER_x format (osimpy convention)
+    rename_map = {}
+    for col in wide.columns:
+        if col.startswith("x_") or col.startswith("y_") or col.startswith("z_"):
+            prefix, name = col.split("_", 1)
+            rename_map[col] = f"{name}_{prefix}"
+    wide = wide.rename(rename_map)
+
+    # Sort columns alphabetically by marker name for TRC format
+    marker_names = sorted(markers_df["marker_name"].unique().to_list())
+    sorted_cols = ["frame", "time"]
+    for name in marker_names:
+        for suffix in ["_x", "_y", "_z"]:
+            col = f"{name}{suffix}"
+            if col in wide.columns:
+                sorted_cols.append(col)
+    return wide.select(sorted_cols)
 
 
 # =========================================================================
